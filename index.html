@@ -209,6 +209,18 @@ classes:[
    combatFeatures:[{name:"Infuser un objet",charges:2,recovery:"long",desc:"Infuse des objets non-magiques avec des propriétés magiques. Infusions actives = niv/2 arrondi inf.",icon:"⚙"},{name:"Bricolage magique",charges:0,recovery:"passive",desc:"Touche un objet inanimé : lumière, message enregistré, odeur, image ou son.",icon:"🔧"}],
    equipment:[[{name:"Arbalète légère",qty:1,desc:"1d8 perforant"},{name:"20 carreaux",qty:1,desc:"Munitions"},{name:"Armure d'écailles",qty:1,desc:"CA 14+DEX(max2)"},{name:"Outils de voleur",qty:1,desc:"Maîtrise requise"},{name:"Pack du donjon",qty:1,desc:"Pied de biche, torches"}]]},
 ],
+draconicAncestries:[
+  {name:"Noir",damage:"Acide",shape:"Ligne 1,5m × 9m",icon:"🖤"},
+  {name:"Bleu",damage:"Foudre",shape:"Ligne 1,5m × 9m",icon:"💙"},
+  {name:"Laiton",damage:"Feu",shape:"Ligne 1,5m × 9m",icon:"🟡"},
+  {name:"Bronze",damage:"Foudre",shape:"Ligne 1,5m × 9m",icon:"🟤"},
+  {name:"Cuivre",damage:"Acide",shape:"Ligne 1,5m × 9m",icon:"🟠"},
+  {name:"Or",damage:"Feu",shape:"Cône 4,5m",icon:"⭐"},
+  {name:"Vert",damage:"Poison",shape:"Cône 4,5m",icon:"💚"},
+  {name:"Rouge",damage:"Feu",shape:"Cône 4,5m",icon:"❤️"},
+  {name:"Argent",damage:"Froid",shape:"Cône 4,5m",icon:"🩶"},
+  {name:"Blanc",damage:"Froid",shape:"Cône 4,5m",icon:"🤍"},
+],
 mcReqs:{Barbare:[[0,13]],Barde:[[5,13]],Clerc:[[4,13]],Druide:[[4,13]],Ensorceleur:[[5,13]],Guerrier:[[0,13],[1,13],'or'],Magicien:[[3,13]],Moine:[[1,13],[4,13],'and'],Occultiste:[[5,13]],Paladin:[[0,13],[5,13],'and'],Rôdeur:[[1,13],[4,13],'and'],Roublard:[[1,13]],Artificier:[[3,13]]},
 races:[
   {name:"Humain",speed:9,bonuses:[0,0,0,0,0,0],allBonus:1,traits:"Polyvalent : +1 à toutes les caractéristiques.",languages:"Commun + 1 au choix"},
@@ -222,7 +234,7 @@ races:[
   {name:"Demi-Elfe",speed:9,bonuses:[0,0,0,0,0,2],flexBonus:2,traits:"+2 CHA, +1 à deux autres au choix. Vision nuit 18m, résistance enchantement, 2 compétences.",languages:"Commun, Elfique + 1 au choix"},
   {name:"Demi-Orc",speed:9,bonuses:[2,0,1,0,0,0],traits:"Vision nuit 18m, menaçant (maîtrise Intimidation), robustesse endurante, attaques sauvages.",languages:"Commun, Orc"},
   {name:"Tieffelin",speed:9,bonuses:[0,0,0,1,0,2],traits:"Vision nuit 18m, résistance feu, ascendance infernale.",languages:"Commun, Infernal"},
-  {name:"Dragonide",speed:9,bonuses:[2,0,0,0,0,1],traits:"Ascendance draconique, souffre draconique, résistance au type draconique.",languages:"Commun, Draconique"},
+  {name:"Dragonide",speed:9,bonuses:[2,0,0,0,0,1],traits:"Ascendance draconique au choix (couleur du dragon). Souffle draconique : action, JS CON, 1 fois/repos court ou long. Résistance au type de dégâts correspondant.",languages:"Commun, Draconique"},
   {name:"Aasimar",speed:9,bonuses:[0,0,0,0,1,2],traits:"Vision nuit 18m, résistance nécrotique et radiant, connaissance céleste.",languages:"Commun, Céleste"},
 ],
 weapons:[
@@ -376,8 +388,8 @@ const CLASS_SAVES={Barbare:[0,2],Barde:[1,5],Clerc:[4,5],Druide:[3,4],Guerrier:[
 // ═══════════════════════════════════════
 const SK='dnd5e_v5';
 let state={players:[],activeIdx:0,activeTab:'perso'};
-let CS={step:1,race:null,classe:null,archetype:null,statMethod:'pointbuy',baseStats:[8,8,8,8,8,8],background:null,selectedSkills:[],selectedSpells:[],equipChoice:0,charName:'',alignment:'',diceRolls:null};
-function resetCS(){CS={step:1,race:null,classe:null,archetype:null,statMethod:'pointbuy',baseStats:[8,8,8,8,8,8],background:null,selectedSkills:[],selectedSpells:[],equipChoice:0,charName:'',alignment:'',diceRolls:null};}
+let CS={step:1,race:null,classe:null,archetype:null,statMethod:'pointbuy',baseStats:[8,8,8,8,8,8],background:null,selectedSkills:[],selectedSpells:[],equipChoice:0,charName:'',alignment:'',diceRolls:null,draconicAncestry:null};
+function resetCS(){CS={step:1,race:null,classe:null,archetype:null,statMethod:'pointbuy',baseStats:[8,8,8,8,8,8],background:null,selectedSkills:[],selectedSpells:[],equipChoice:0,charName:'',alignment:'',diceRolls:null,draconicAncestry:null};}
 
 // Descriptions des capacités par nom (source SRD aidedd)
 const FEAT_DESCS={
@@ -772,11 +784,11 @@ function renderTabBar(){
     {id:'perso',label:'⚔ Personnage'},
     {id:'competences',label:'✦ Compétences'},
     {id:'combat',label:'🗡 Combat'},
+    {id:'sorts',label:'✦ Sorts'},
     {id:'equipement',label:'🛡 Équipement'},
     {id:'sac',label:'🎒 Sac'},
     {id:'historique',label:'📜 Historique'},
     {id:'xp',label:'✧ Expérience'},
-    {id:'sorts',label:'✦ Sorts'},
   ];
   if(p.pendingLevelUp)TABS.push({id:'levelup',label:'⬆ Niveau +',cls:'lvlup'});
   // Onglet actif = state.activeTab
@@ -859,9 +871,21 @@ function tabCreation(){
 }
 
 function creStep1(){
+  const isDragonide = CS.race==='Dragonide';
+  const canContinue = CS.race && (!isDragonide || CS.draconicAncestry);
   return`<div><p style="font-size:13px;color:var(--text2);margin-bottom:12px">Choisis la race de ton personnage.</p>
-    <div class="crd-grid">${SRD.races.map(r=>{const b=r.allBonus?`+${r.allBonus} à tout`:r.bonuses.map((v,i)=>v?`+${v} ${ABILITIES_SH[i]}`:'').filter(Boolean).join(', ');return`<div class="crd${CS.race===r.name?' selected':''}" onclick="CS.race='${esc(r.name)}';renderTab()"><h3>${esc(r.name)}</h3><p>${esc(r.traits.slice(0,65))}…</p><span class="tag">🏃 ${r.speed}m</span><span class="tag" style="color:#4caf50">${b}</span></div>`;}).join('')}</div>
-    ${CS.race?`<div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:8px"><div style="font-size:13px;font-weight:600;color:var(--cp)">${esc(CS.race)}</div><div style="font-size:12px;color:var(--text2);margin-top:4px">${esc((SRD.races.find(r=>r.name===CS.race)||{}).traits||'')}</div></div><button class="btn bac" style="margin-top:12px;width:100%" onclick="CS.step=2;renderTab()">Continuer → Classe</button>`:''}
+    <div class="crd-grid">${SRD.races.map(r=>{const b=r.allBonus?`+${r.allBonus} à tout`:r.bonuses.map((v,i)=>v?`+${v} ${ABILITIES_SH[i]}`:'').filter(Boolean).join(', ');return`<div class="crd${CS.race===r.name?' selected':''}" onclick="CS.race='${esc(r.name)}';CS.draconicAncestry=null;renderTab()"><h3>${esc(r.name)}</h3><p>${esc(r.traits.slice(0,65))}…</p><span class="tag">🏃 ${r.speed}m</span><span class="tag" style="color:#4caf50">${b}</span></div>`;}).join('')}</div>
+    ${CS.race?`<div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:8px"><div style="font-size:13px;font-weight:600;color:var(--cp)">${esc(CS.race)}</div><div style="font-size:12px;color:var(--text2);margin-top:4px">${esc((SRD.races.find(r=>r.name===CS.race)||{}).traits||'')}</div></div>`:''}
+    ${isDragonide?`<div style="margin-top:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--cp);margin-bottom:8px">🐉 Choisis ton ascendance draconique <span style="color:#e53935">*</span></div>
+      <div class="crd-grid">${SRD.draconicAncestries.map(a=>`<div class="crd${CS.draconicAncestry===a.name?' selected':''}" onclick="CS.draconicAncestry='${esc(a.name)}';renderTab()">
+        <h3>${a.icon} ${esc(a.name)}</h3>
+        <p style="font-size:11px">${esc(a.damage)}</p>
+        <span class="tag" style="font-size:10px">${esc(a.shape)}</span>
+      </div>`).join('')}</div>
+      ${CS.draconicAncestry?`<div style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:6px;font-size:12px;color:#4caf50">✓ Dragon <strong>${esc(CS.draconicAncestry)}</strong> — Souffle : ${esc((SRD.draconicAncestries.find(a=>a.name===CS.draconicAncestry)||{}).damage||'')} (${esc((SRD.draconicAncestries.find(a=>a.name===CS.draconicAncestry)||{}).shape||'')})</div>`:``}
+    </div>`:''}
+    ${CS.race?`<button class="btn bac" style="margin-top:12px;width:100%" onclick="CS.step=2;renderTab()" ${canContinue?'':'disabled'}>Continuer → Classe</button>`:''}
   </div>`;
 }
 
@@ -941,7 +965,7 @@ function creStep6Sorts(){
       <div style="flex:1;padding:8px;background:var(--surface2);border-radius:8px;text-align:center"><div style="font-size:11px;color:var(--text3)">Sorts niv.1</div><div style="font-size:20px;font-weight:700;color:var(--cp)">${selL1.length}/${l1Max}</div></div>
     </div>
     <div style="font-size:12px;font-weight:600;color:var(--cp);margin-bottom:6px">Sorts mineurs</div>
-    ${(SPELLS_DB||SRD.spells).filter(s=>s.level===0&&(s.classes||[]).includes(CS.classe||'')||(SRD.spells.some(x=>x.name===s.name))).map(s=>{const isSel=sel.includes(s.name);const dis=!isSel&&selC.length>=cantripCount;return`<div class="sk-choice${isSel?' selected':dis?' disabled':''}" onclick="${dis?'':'creToggleSpell(\''+esc(s.name)+'\')'}"><span class="sk-dot${isSel?' p':''}"></span><span style="flex:1;font-size:13px">${esc(s.name)}</span><span style="font-size:11px;color:var(--text3)">${esc(s.school)} • ${esc(s.castTime)}</span>${isSel?`<span style="color:var(--cp)">✓</span>`:''}</div>`;}).join('')}
+    ${(SPELLS_DB||SRD.spells).filter(s=>s.level===0&&(!SPELLS_DB||(s.classes||[]).includes(CS.classe||''))).map(s=>{const isSel=sel.includes(s.name);const dis=!isSel&&selC.length>=cantripCount;return`<div class="sk-choice${isSel?' selected':dis?' disabled':''}" onclick="${dis?'':'creToggleSpell(\''+esc(s.name)+'\')'}"><span class="sk-dot${isSel?' p':''}"></span><span style="flex:1;font-size:13px">${esc(s.name)}</span><span style="font-size:11px;color:var(--text3)">${esc(s.school)} • ${esc(s.castTime)}</span>${isSel?`<span style="color:var(--cp)">✓</span>`:''}</div>`;}).join('')}
     <div style="font-size:12px;font-weight:600;color:var(--cp);margin:10px 0 6px">Sorts de niveau 1</div>
     ${SRD.spells.filter(s=>s.level===1).map(s=>{const isSel=sel.includes(s.name);const dis=!isSel&&selL1.length>=l1Max;return`<div class="sk-choice${isSel?' selected':dis?' disabled':''}" onclick="${dis?'':'creToggleSpell(\''+esc(s.name)+'\')'}"><span class="sk-dot${isSel?' p':''}"></span><span style="flex:1;font-size:13px">${esc(s.name)}</span><span style="font-size:11px;color:var(--text3)">${esc(s.school)}${s.damage?' • '+esc(s.damage):''}</span>${isSel?`<span style="color:var(--cp)">✓</span>`:''}</div>`;}).join('')}
     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="CS.step=5;renderTab()">← Retour</button><button class="btn bac" style="flex:2" onclick="CS.step=7;renderTab()" ${selC.length>=cantripCount&&selL1.length>=l1Max?'':'disabled'}>Continuer → Équipement</button></div>
@@ -985,7 +1009,7 @@ function confirmCreation(){
   if(!CS.charName.trim()||!CS.race||!CS.classe)return;
   let base=[...CS.baseStats];if(CS.statMethod==='dice'&&CS.diceRolls)base=[...CS.diceRolls];
   const finals=getFinalStats(base,CS.race);
-  p.charName=CS.charName.trim();p.race=CS.race;p.background=CS.background||'';p.alignment=CS.alignment;
+  p.charName=CS.charName.trim();p.race=CS.race;p.draconicAncestry=CS.draconicAncestry||null;p.background=CS.background||'';p.alignment=CS.alignment;
   p.classes=[{name:CS.classe,level:1}];p.abilities=[...finals];p.abilitiesLocked=true;
   const hpBase=cd?cd.hdVal:8;p.hpMax=Math.max(1,hpBase+mod(finals[2]));p.hp=p.hpMax;
   p.ac=10+mod(finals[1]);p.speed=rd?rd.speed:9;
@@ -1582,6 +1606,34 @@ function tabCombat(p){
       </div>`;
     })()}
 
+    <!-- Souffle draconique — Dragonide -->
+    ${(()=>{
+      if(p.race!=='Dragonide'||!p.draconicAncestry)return'';
+      const anc=SRD.draconicAncestries.find(a=>a.name===p.draconicAncestry);
+      if(!anc)return'';
+      const conM=p.abilities?Math.floor((p.abilities[2]-10)/2):0;
+      const dc=8+pb(lvl)+conM;
+      const diceCnt=lvl>=16?5:lvl>=11?4:lvl>=6?3:2;
+      const dmg=`${diceCnt}d6 ${anc.damage}`;
+      const used=(p.combatCharges||{})['SouffleDraconique']===true;
+      return`<div class="panel mb10">
+        <div class="pt" style="display:flex;align-items:center;justify-content:space-between">
+          <span>${anc.icon} Souffle draconique — ${esc(anc.name)}</span>
+          <span style="font-size:10px;color:var(--cp);border:1px solid var(--cp);border-radius:10px;padding:2px 8px">1×/Repos</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">
+          ${esc(anc.shape)} • <strong style="color:var(--cp)">${esc(dmg)}</strong> • JS CON DD ${dc} (½ si réussi)<br>
+          <span style="font-size:11px;color:var(--text3)">Résistance au type ${esc(anc.damage)}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="slot-bubble${used?' used':''}" style="width:18px;height:18px" onclick="toggleDraconicBreath()"></span>
+          <span style="font-size:12px;color:${used?'var(--text3)':'var(--cp)'}">${used?'Utilisé — Recharge au repos':'Disponible'}</span>
+          <button class="btn bsm" onclick="rollCustomDmg('${diceCnt}d6','Souffle ${esc(anc.name)}')">🎲 ${esc(dmg)}</button>
+        </div>
+        ${used?`<button class="btn bsm" style="margin-top:8px" onclick="P().combatCharges=P().combatCharges||{};delete P().combatCharges['SouffleDraconique'];saveAll();render();" >↺ Récupérer (Repos court/long)</button>`:''}
+      </div>`;
+    })()}
+
     <!-- Emplacements Occultiste (récupérés au repos court) -->
     ${warlockSlots?`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;justify-content:space-between"><span>Magie de pacte — Occultiste</span><span style="font-size:10px;color:var(--cp);border:1px solid var(--cp);border-radius:10px;padding:2px 8px">Repos court</span></div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Niveau des emplacements : <strong style="color:var(--cp)">${warlockSlots[1]}</strong></div>
@@ -1593,7 +1645,7 @@ function tabCombat(p){
     </div>`:''}
 
     <!-- Sorts -->
-    ${hasCaster?`<div class="panel"><div class="pt" style="display:flex;align-items:center;justify-content:space-between">Sorts <button class="btn bsm" onclick="setTab('sorts');_sortSubTab='compendium';render()">📚 Compendium</button></div>
+    ${hasCaster?`<div class="panel"><div class="pt">Sorts</div>
       <div class="g3 mb10">
         <div class="sb hi"><div class="sn">Bonus sort</div><div style="font-size:18px;font-weight:600;color:var(--cp)">${fmt(pb(lvl)+spellMod)}</div></div>
         <div class="sb hi"><div class="sn">DD sort</div><div style="font-size:18px;font-weight:600;color:var(--cp)">${8+pb(lvl)+spellMod}</div></div>
@@ -1607,7 +1659,7 @@ function tabCombat(p){
         const known=(p.spells||[]).filter(s=>{const sp=findSpellData(s.name);return sp&&sp.level>0;}).length;
         return`<div style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text2)">📚 Sorts préparés : <strong style="color:${known>prepMax?'#e53935':'var(--cp)'}">${known}/${prepMax}</strong> (INT ${fmt(intM)} + niv. ${magLvl})</div>`;
       })()}
-      ${renderSpellList(p)}
+      ${renderSpellList(p, true)}
     </div>`:''}
   </div></div>`;
 }
@@ -1624,6 +1676,7 @@ function rollCustomDmg(dice,name){
 
 function useCombatCharge(name,max){const p=P();if(!p.combatCharges)p.combatCharges={};const cur=p.combatCharges[name]!==undefined?p.combatCharges[name]:max;if(cur<=0){showToast('❌ Plus de charges disponibles !');return;}p.combatCharges[name]=cur-1;render();}
 function recoverCombatCharge(name,max){const p=P();if(!p.combatCharges)p.combatCharges={};p.combatCharges[name]=max;render();}
+function toggleDraconicBreath(){const p=P();if(!p.combatCharges)p.combatCharges={};if(p.combatCharges['SouffleDraconique'])delete p.combatCharges['SouffleDraconique'];else p.combatCharges['SouffleDraconique']=true;saveAll();render();}
 function toggleSlot(ni,si,total){const p=P();if(!p.spellSlotsUsed)p.spellSlotsUsed=[];const u=p.spellSlotsUsed[ni]||0;p.spellSlotsUsed[ni]=u>si?u-1:Math.min(total,u+1);render();}
 function toggleWarlockSlot(si,total){const p=P();if(!p.spellSlotsUsed)p.spellSlotsUsed=[];const u=p.spellSlotsUsed[9]||0;p.spellSlotsUsed[9]=u>si?u-1:Math.min(total,u+1);render();}
 function toggleKi(idx,max){const p=P();if(!p.combatCharges)p.combatCharges={};const cur=p.combatCharges['Ki']!==undefined?p.combatCharges['Ki']:max;p.combatCharges['Ki']=idx<cur?idx:Math.min(max,idx+1);render();}
@@ -1643,15 +1696,28 @@ function findSpellData(name){
   return null;
 }
 
-function renderSpellList(p){
-  if(!(p.spells||[]).length)return`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:8px">Aucun sort enregistré.</div>`;
+// Classes qui préparent leurs sorts (les autres les "connaissent" → toujours prêts)
+const PREP_CASTERS=['Magicien','Clerc','Druide','Paladin','Artificier'];
+
+function isPrepCaster(p){
+  return (p.classes||[]).some(c=>PREP_CASTERS.includes(c.name));
+}
+
+// combatOnly=true → n'affiche que cantrips + sorts préparés (pour l'onglet Combat)
+function renderSpellList(p, combatOnly){
+  const spells = p.spells||[];
+  if(!spells.length)return`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:8px">Aucun sort enregistré.</div>`;
+  const prepCaster = isPrepCaster(p);
   const byLvl={};
-  p.spells.forEach(s=>{
+  spells.forEach(s=>{
     const data=findSpellData(s.name);
     const lv=data?data.level:(s.level||0);
+    // En mode combat, on filtre : cantrips toujours visibles, niveaux 1+ seulement si préparé (ou classe "connaît")
+    if(combatOnly && lv>0 && prepCaster && !s.prepared) return;
     if(!byLvl[lv])byLvl[lv]=[];
     byLvl[lv].push({...s,data,stableId:'spl_'+s.name.replace(/[^a-zA-Z0-9]/g,'_')});
   });
+  if(!Object.keys(byLvl).length)return`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:8px">Aucun sort préparé.</div>`;
   return Object.keys(byLvl).sort((a,b)=>a-b).map(lv=>`
     <div style="margin-bottom:10px">
       <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border)">${lv==='0'?'⭐ Sorts mineurs':'✦ Niveau '+lv}</div>
@@ -1666,14 +1732,17 @@ function renderSpellList(p){
         const damage=d?d.damage:'';
         const ritual=d&&d.ritual;
         const rolls=d&&d.rolls?d.rolls:[];
+        const lvi=parseInt(lv);
+        const isPrepared=s.prepared||lvi===0||!prepCaster;
         return`
         <div class="sort-row">
           <div class="sort-head" onclick="document.getElementById('${s.stableId}').classList.toggle('open')">
             <div style="flex:1">
-              <div style="font-size:13px;font-weight:600">${esc(s.name)}${ritual?' <span style="font-size:10px;color:var(--cp)">(R)</span>':''}</div>
+              <div style="font-size:13px;font-weight:600;${!isPrepared?'color:var(--text3)':''}">${esc(s.name)}${ritual?' <span style="font-size:10px;color:var(--cp)">(R)</span>':''}${isPrepared&&lvi>0&&prepCaster?'  <span style="font-size:9px;background:rgba(76,175,80,.15);color:#4caf50;border-radius:8px;padding:1px 5px">Préparé</span>':''}</div>
               ${d?`<div style="font-size:11px;color:var(--text3)">${esc(school)}${castTime?' • '+esc(castTime):''}${range?' • '+esc(range):''}</div>`:''}
             </div>
             ${damage?`<span style="font-size:11px;color:var(--cp);margin-right:6px">${esc(damage)}</span>`:''}
+            ${!combatOnly&&prepCaster&&lvi>0?`<button class="btn bsm" style="margin-right:6px;${isPrepared?'background:rgba(76,175,80,.15);color:#4caf50;border-color:#4caf50':''}" onclick="event.stopPropagation();togglePrepareSpell('${esc(s.name)}')">${isPrepared?'✓ Prêt':'Préparer'}</button>`:''}
             <span style="color:var(--text3)">▾</span>
           </div>
           <div class="sort-body" id="${s.stableId}">
@@ -1693,12 +1762,21 @@ function renderSpellList(p){
     </div>`).join('');
 }
 
+function togglePrepareSpell(name){
+  const p=P();
+  if(!p.spells)return;
+  const s=p.spells.find(x=>x.name===name);
+  if(s)s.prepared=!s.prepared;
+  saveAll();render();
+}
+
 
 
 // ═══════════════════════════════════════
 // TAB: SORTS
 // ═══════════════════════════════════════
-let _sortSubTab = 'mes-sorts'; // 'mes-sorts' ou 'compendium'
+let _sortSubTab = 'mes-sorts'; // 'mes-sorts' | 'compendium' | 'apprendre'
+let _learnSpellSearch = {q:'',school:''};
 
 function tabSorts(p){
   const hasCaster = (p.classes||[{name:p.classe,level:p.niveau||1}]).some(c=>{
@@ -1706,28 +1784,130 @@ function tabSorts(p){
   });
   if(!hasCaster) return`<div class="panel"><p style="color:var(--text3);font-size:13px">Cette classe n'est pas une classe de sorts.</p></div>`;
 
+  const userIsMJ = isMJ(); // via mjMode — sera connecté aux rôles Firebase
+  const magLvl = ((p.classes||[]).find(c=>c.name==='Magicien')||{}).level||0;
+  const prepCaster = isPrepCaster(p);
+
   // Sous-tabs
   const subBar = `<div style="display:flex;gap:6px;margin-bottom:12px">
     <button class="btn${_sortSubTab==='mes-sorts'?' bprimary':''}" onclick="_sortSubTab='mes-sorts';render()" style="flex:1">📖 Mes sorts</button>
-    <button class="btn${_sortSubTab==='compendium'?' bprimary':''}" onclick="_sortSubTab='compendium';render()" style="flex:1">📚 Compendium</button>
+    ${userIsMJ?`<button class="btn${_sortSubTab==='compendium'?' bprimary':''}" onclick="_sortSubTab='compendium';render()" style="flex:1">📚 Ajouter (MJ)</button>`:''}
+    ${magLvl?`<button class="btn${_sortSubTab==='apprendre'?' bprimary':''}" onclick="_sortSubTab='apprendre';render()" style="flex:1">📜 Apprendre</button>`:''}
   </div>`;
 
-  if(_sortSubTab === 'compendium'){
+  if(_sortSubTab === 'compendium' && userIsMJ){
     return`<div>${subBar}${renderCompendiumSearch(p)}</div>`;
   }
 
+  if(_sortSubTab === 'apprendre' && magLvl){
+    return`<div>${subBar}${renderLearnSpell(p, magLvl)}</div>`;
+  }
+
   // Sous-tab "Mes sorts"
-  const knownCount = (p.spells||[]).length;
+  const allSpells = p.spells||[];
+  const knownCount = allSpells.length;
+  let prepInfo = '';
+  if(prepCaster){
+    const intM = p.abilities ? Math.floor((p.abilities[3]-10)/2) : 0;
+    const sagM = p.abilities ? Math.floor((p.abilities[4]-10)/2) : 0;
+    const chaM = p.abilities ? Math.floor((p.abilities[5]-10)/2) : 0;
+    const lvl = (p.classes||[]).reduce((sum,c)=>sum+c.level,0);
+    const magC = (p.classes||[]).find(c=>c.name==='Magicien');
+    const clericC = (p.classes||[]).find(c=>c.name==='Clerc');
+    const druidC = (p.classes||[]).find(c=>c.name==='Druide');
+    const paladinC = (p.classes||[]).find(c=>c.name==='Paladin');
+    const artificerC = (p.classes||[]).find(c=>c.name==='Artificier');
+    let prepMax = 1;
+    if(magC) prepMax = Math.max(1, intM + magC.level);
+    else if(clericC) prepMax = Math.max(1, sagM + clericC.level);
+    else if(druidC) prepMax = Math.max(1, sagM + druidC.level);
+    else if(paladinC) prepMax = Math.max(1, chaM + Math.floor(paladinC.level/2));
+    else if(artificerC) prepMax = Math.max(1, intM + Math.floor(artificerC.level/2));
+    const prepCount = allSpells.filter(s=>{const sp=findSpellData(s.name);return s.prepared&&sp&&sp.level>0;}).length;
+    prepInfo = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px;background:var(--surface2);border-radius:8px;font-size:12px">
+      <span style="color:var(--text2)">Sorts préparés :</span>
+      <strong style="color:${prepCount>prepMax?'#e53935':'#4caf50'};font-size:14px">${prepCount}/${prepMax}</strong>
+      <span style="color:var(--text3);font-size:11px">(Cliquez sur un sort pour le préparer / retirer)</span>
+    </div>`;
+  }
+
   return`<div>
     ${subBar}
     <div class="panel">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div class="pt" style="margin-bottom:0">Mes sorts (${knownCount})</div>
-        <button class="btn bsm bprimary" onclick="_sortSubTab='compendium';render()">+ Ajouter</button>
       </div>
-      ${renderSpellList(p)}
+      ${prepInfo}
+      ${renderSpellList(p, false)}
     </div>
   </div>`;
+}
+
+function renderLearnSpell(p, magLvl){
+  const cur = p.currency||{po:0};
+  const knownNames = (p.spells||[]).map(s=>s.name);
+  const db = getSpellsDB();
+  const isLoaded = !!SPELLS_DB;
+  const schools = isLoaded ? [...new Set(SPELLS_DB.map(s=>s.school).filter(Boolean))].sort() : [];
+  // Niveaux préparables : emplacements max selon niveau Magicien
+  const maxSlotLvl = [0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,9,9][Math.min(magLvl,20)];
+
+  const results = isLoaded
+    ? searchSpellsDB(_learnSpellSearch.q,'Magicien',null,_learnSpellSearch.school||null)
+        .filter(s=>s.level>0 && s.level<=maxSlotLvl && !knownNames.includes(s.name))
+        .slice(0,50)
+    : [];
+
+  return`<div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:600;color:var(--cp);margin-bottom:4px">📜 Copier un sort dans votre grimoire</div>
+      <div style="font-size:12px;color:var(--text3)">Coût : 2h + <strong>50 po par niveau du sort</strong> — Réservé aux sorts Magicien niveaux 1-${maxSlotLvl}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Votre trésor actuel : <strong style="color:var(--cp)">${cur.po||0} po</strong></div>
+    </div>
+    ${!isLoaded?`<div style="text-align:center;padding:16px"><button class="btn bprimary" onclick="loadSpellsDB(()=>render())">⬇️ Charger le compendium</button></div>`:`
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <input type="text" placeholder="🔍 Rechercher..." value="${esc(_learnSpellSearch.q)}"
+          oninput="_learnSpellSearch.q=this.value;render()"
+          style="flex:2;min-width:140px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px">
+        <select onchange="_learnSpellSearch.school=this.value;render()"
+          style="flex:1;min-width:100px;padding:7px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px">
+          <option value="">Toutes écoles</option>
+          ${schools.map(sc=>`<option value="${sc}"${_learnSpellSearch.school===sc?' selected':''}>${sc}</option>`).join('')}
+        </select>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">${results.length} sort(s) disponible(s) à copier</div>
+      <div style="max-height:400px;overflow-y:auto">
+        ${results.map(s=>{
+          const cost = s.level * 50;
+          const canAfford = (cur.po||0) >= cost;
+          return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:5px;display:flex;align-items:center;gap:8px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600">${esc(s.name)}</div>
+              <div style="font-size:11px;color:var(--text3)">Niv.${s.level} • ${esc(s.school)} • ${esc(s.castTime)}</div>
+              <div style="font-size:11px;color:${canAfford?'#4caf50':'#e53935'};margin-top:2px">${cost} po — ${canAfford?'✓ Fonds suffisants':'✗ Fonds insuffisants'}</div>
+            </div>
+            <button class="btn bsm${canAfford?' bprimary':''}" onclick="learnSpell('${esc(s.name)}',${s.level},${cost})" ${canAfford?'':'disabled'}>Copier</button>
+          </div>`;
+        }).join('')}
+      </div>
+    `}
+  </div>`;
+}
+
+function learnSpell(name, level, cost){
+  const p = P();
+  const cur = p.currency||{pc:0,pa:0,pe:0,po:0,pp:0};
+  if((cur.po||0) < cost){
+    showToast(`❌ Fonds insuffisants ! Il vous faut ${cost} po (vous avez ${cur.po||0} po)`);
+    return;
+  }
+  if(!p.spells)p.spells=[];
+  if(p.spells.find(s=>s.name===name)){showToast('Ce sort est déjà dans votre grimoire.');return;}
+  p.spells.push({name,prepared:false,level});
+  if(!p.currency)p.currency={pc:0,pa:0,pe:0,po:0,pp:0};
+  p.currency.po = (p.currency.po||0) - cost;
+  saveAll();render();
+  showToast(`✅ "${name}" copié dans votre grimoire ! −${cost} po (2h de travail)`);
 }
 
 // ═══════════════════════════════════════
@@ -1801,7 +1981,7 @@ function addSpellToChar(name){
   const data=findSpellData(name);
   if(!p.spells.find(s=>s.name===name)){
     p.spells.push({name,prepared:false,level:data?data.level:0});
-    saveData();render();
+    saveAll();render();
     showToast('✅ '+name+' ajouté !');
   }
 }
@@ -1810,7 +1990,7 @@ function removeSpellFromChar(name){
   const p=P();
   if(!p.spells)return;
   p.spells=p.spells.filter(s=>s.name!==name);
-  saveData();render();
+  saveAll();render();
   showToast('🗑 '+name+' retiré.');
 }
 
