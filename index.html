@@ -4649,7 +4649,7 @@ async function loadMJPlayersData(){
       const charData=data.characterData||{};
       let playerName='Joueur';let avatar='⚔';
       try{const u=await fbDb.collection('users').doc(data.userId).get();if(u.exists){playerName=u.data().displayName||'Joueur';avatar=u.data().avatar||'⚔';}}catch(e){}
-      players.push({uid:data.userId,playerName,avatar,charData});
+      players.push({uid:data.userId,playerName,avatar,charData,docId:doc.id});
     }
     _mjPlayersData=players;
   }catch(e){showToast('❌ Erreur chargement joueurs : '+e.message);}
@@ -4703,6 +4703,7 @@ function mjTabJoueurs(){
           </div>
           <button class="btn bsm" onclick="mjShowPlayerDetail(${i})">📋 Fiche</button>
           <button class="btn bsm bprimary" onclick="mjAddPlayerToCombat(${i})">⚡ Combat</button>
+          <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="mjModerationModal(${i})" title="Modérer ce joueur">🗑</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
           <div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center">
@@ -4807,6 +4808,57 @@ function mjShowPlayerDetail(idx){
     ${(p.languages||p.proficiencies||(p.weaponProfs&&p.weaponProfs.length))?`<div style="font-size:11px;color:var(--text3);line-height:2">${p.languages?`🗣 <b>Langues :</b> <span style="color:var(--text2)">${esc(p.languages)}</span><br>`:''}${p.proficiencies?`📜 <b>Maîtrises :</b> <span style="color:var(--text2)">${esc(p.proficiencies)}</span><br>`:''}${p.weaponProfs&&p.weaponProfs.length?`⚔ <b>Armes :</b> <span style="color:var(--text2)">${p.weaponProfs.join(', ')}</span><br>`:''}${p.armorProfs&&p.armorProfs.length?`🛡 <b>Armures :</b> <span style="color:var(--text2)">${p.armorProfs.join(', ')}</span>`:''}</div>`:''}
   </div>
   <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn" onclick="closeModal()">Fermer</button></div>`);
+}
+
+function mjModerationModal(idx){
+  const pp=_mjPlayersData[idx];if(!pp)return;
+  const charName=esc(pp.charData&&pp.charData.charName||'Sans nom');
+  const playerName=esc(pp.playerName||'Joueur');
+  openModal(`<div class="pt" style="color:#e53935">🗑 Modération</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Joueur : <b>${playerName}</b> · Personnage : <b>${charName}</b></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn" style="background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.35);color:#e53935;text-align:left;padding:12px 14px;border-radius:8px" onclick="mjDeleteCharacter(${idx})">
+        <div style="font-weight:600;margin-bottom:3px">🗑 Supprimer le personnage</div>
+        <div style="font-size:11px;color:var(--text3)">Supprime <b>${charName}</b> de cette campagne uniquement. Le joueur reste membre de la table.</div>
+      </button>
+      <button class="btn" style="background:rgba(229,57,53,.15);border:1px solid rgba(229,57,53,.6);color:#e53935;text-align:left;padding:12px 14px;border-radius:8px" onclick="mjKickFromTable(${idx})">
+        <div style="font-weight:600;margin-bottom:3px">🚫 Exclure de la table</div>
+        <div style="font-size:11px;color:var(--text3)">Retire <b>${playerName}</b> de la table entière et supprime tous ses personnages dans toutes les campagnes. Irréversible.</div>
+      </button>
+    </div>
+    <div style="margin-top:14px;text-align:right"><button class="btn bsm" onclick="closeModal()">Annuler</button></div>`);
+}
+
+async function mjDeleteCharacter(idx){
+  const pp=_mjPlayersData[idx];if(!pp)return;
+  const charName=pp.charData&&pp.charData.charName||'?';
+  closeModal();
+  try{
+    await fbDb.collection('characters').doc(pp.docId).delete();
+    showToast(`✅ Personnage "${charName}" supprimé de la campagne.`);
+    await loadMJPlayersData();
+    renderMJContent();
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
+
+async function mjKickFromTable(idx){
+  const pp=_mjPlayersData[idx];if(!pp)return;
+  const playerName=pp.playerName||'ce joueur';
+  closeModal();
+  try{
+    const charsSnap=await fbDb.collection('characters').where('tableId','==',currentTableId).where('userId','==',pp.uid).get();
+    const batch=fbDb.batch();
+    charsSnap.docs.forEach(d=>batch.delete(d.ref));
+    batch.update(fbDb.collection('tables').doc(currentTableId),{
+      memberIds:firebase.firestore.FieldValue.arrayRemove(pp.uid),
+      ['memberNames.'+pp.uid]:firebase.firestore.FieldValue.delete(),
+      ['memberAvatars.'+pp.uid]:firebase.firestore.FieldValue.delete()
+    });
+    await batch.commit();
+    showToast(`✅ ${playerName} exclu(e) de la table.`);
+    await loadMJPlayersData();
+    renderMJContent();
+  }catch(e){showToast('❌ Erreur : '+e.message);}
 }
 
 // ─────────────────────────────────────────
