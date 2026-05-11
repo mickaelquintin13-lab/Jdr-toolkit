@@ -520,7 +520,10 @@ function openUserSettings(){
     <button class="btn bac" style="width:100%;margin-bottom:20px" onclick="saveUserSettings()">💾 Sauvegarder</button>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div class="pt" style="margin:0">📚 Mes personnages</div>
-      <button class="btn bsm bprimary" onclick="openCreateStandaloneChar()">+ Créer un personnage</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn bsm" onclick="importStandaloneChar()">📥 Importer JSON</button>
+        <button class="btn bsm bprimary" onclick="openCreateStandaloneChar()">+ Créer</button>
+      </div>
     </div>
     <div>${charHtml}</div>
     <div style="display:flex;justify-content:flex-end;margin-top:14px">
@@ -568,6 +571,24 @@ function openCreateStandaloneChar(){
   closeModal();
   const soloId='solo_'+Date.now();
   enterCampaign('__solo__',soloId,'__solo__','Bibliothèque');
+}
+
+function importStandaloneChar(){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.json,application/json';
+  input.onchange=async e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    try{
+      const text=await file.text();
+      const data=JSON.parse(text);
+      const soloId='solo_'+Date.now();
+      closeModal();
+      await enterCampaign('__solo__',soloId,'__solo__','Bibliothèque',data);
+    }catch(err){showToast('❌ Fichier JSON invalide.');}
+  };
+  input.click();
 }
 
 // ─── EXPORT / IMPORT PERSONNAGE ───
@@ -6733,6 +6754,65 @@ function mjTabRegles(){
         • <strong style="color:#ffd54f">1 naturel</strong> → 2 échecs d'un coup.<br>
         • <strong style="color:#ffd54f">20 naturel</strong> → Retour à 1 PV, debout.<br>
         • Subir des dégâts à 0 PV → 1 échec (ou 2 si corps à corps).
+      </div>
+    </div>`)}
+    ${ds('s-magie-sauvage',`<div class="regles-section">
+      ${dh('🎲 Magie Sauvage — Table de Sursaut (d100)')}
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Déclenché par <strong>Marée du chaos</strong> ou à la discrétion du MJ après qu'un ensorceleur lance un sort. Lancez 1d100.</div>
+      <div style="max-height:320px;overflow-y:auto">
+      <table class="regles-table" style="font-size:11px">
+        <tr><th style="width:52px">d100</th><th>Effet</th></tr>
+        <tr><td>01–02</td><td>Lancez sur ce tableau au début de chacun de vos tours pendant 1 minute (ignorez ce résultat lors des lancers suivants).</td></tr>
+        <tr><td>03–04</td><td>Pendant 1 minute, vous voyez toute créature invisible dans votre ligne de vue.</td></tr>
+        <tr><td>05–06</td><td>Un modrone contrôlé par le MJ apparaît à 1,50 m de vous, puis disparaît après 1 minute.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">07–08</td><td><strong>Boule de feu</strong> niv. 3 centrée sur vous-même.</td></tr>
+        <tr><td>09–10</td><td><strong>Projectile magique</strong> niv. 5.</td></tr>
+        <tr><td>11–12</td><td>Lancez 1d10. Votre taille change de ce nombre de cm. Impair = vous rétrécissez, pair = vous grandissez.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">13–14</td><td><strong>Confusion</strong> centrée sur vous-même.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">15–16</td><td>Pendant 1 minute, vous récupérez 5 PV au début de chacun de vos tours.</td></tr>
+        <tr><td>17–18</td><td>Vous faites pousser une barbe de plumes. Elle disparaît quand vous éternuez (les plumes explosent).</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">19–20</td><td><strong>Graisse</strong> centrée sur vous-même.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">21–22</td><td>Les créatures ont le désavantage aux JS contre votre prochain sort lancé dans la prochaine minute.</td></tr>
+        <tr><td>23–24</td><td>Votre peau devient bleue vif. Un <em>Désenvoûtement</em> met fin à l'effet.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">25–26</td><td>Un œil apparaît sur votre front pendant 1 minute : avantage aux tests de Perception (vue).</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">27–28</td><td>Pendant 1 minute, vos sorts à temps d'incantation de 1 action deviennent des actions bonus.</td></tr>
+        <tr><td>29–30</td><td>Téléportation jusqu'à 18 m vers un espace inoccupé visible.</td></tr>
+        <tr><td>31–32</td><td>Transporté dans le Plan Astral jusqu'à la fin de votre prochain tour, puis retour à votre emplacement précédent.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">33–34</td><td>Maximisez les dégâts du prochain sort d'attaque dans la prochaine minute.</td></tr>
+        <tr><td>35–36</td><td>Lancez 1d10. Votre âge change de ce nombre d'années. Impair = rajeunit (min. 1 an), pair = vieillit.</td></tr>
+        <tr><td>37–38</td><td>1d6 flumphs contrôlés par le MJ apparaissent dans un rayon de 18 m, effrayés par vous. Disparaissent après 1 minute.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">39–40</td><td>Vous récupérez 2d10 PV.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">41–42</td><td>Vous devenez une plante en pot jusqu'à votre prochain tour : neutralisé, vulnérabilité à tous les dégâts.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">43–44</td><td>Pendant 1 minute, téléportation jusqu'à 6 m en action bonus à chaque tour.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">45–46</td><td><strong>Lévitation</strong> sur vous-même.</td></tr>
+        <tr><td>47–48</td><td>Une licorne contrôlée par le MJ apparaît à 1,50 m, disparaît après 1 minute.</td></tr>
+        <tr><td>49–50</td><td>Vous ne pouvez pas parler pendant 1 minute (des bulles roses sortent de votre bouche à la place).</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">51–52</td><td>Bouclier spectral pendant 1 minute : +2 CA et immunité aux Projectiles magiques.</td></tr>
+        <tr><td>53–54</td><td>Immunité à l'ivresse alcoolique pendant 5d6 jours.</td></tr>
+        <tr><td>55–56</td><td>Vos cheveux tombent, mais repoussent en 24 heures.</td></tr>
+        <tr><td>57–58</td><td>Pendant 1 minute, tout objet inflammable non porté que vous touchez s'enflamme.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">59–60</td><td>Téléportation jusqu'à 18 m ; toutes les créatures dans l'espace d'arrivée subissent 1d10 dégâts de force.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">61–62</td><td>Vous êtes effrayé par la créature la plus proche jusqu'à la fin de votre prochain tour.</td></tr>
+        <tr><td>63–64</td><td>Toutes les créatures dans un rayon de 9 m deviennent invisibles pendant 1 minute (cesse si elles attaquent ou lancent un sort).</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">65–66</td><td>Résistance à tous les dégâts pendant 1 minute.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">67–68</td><td>Une créature aléatoire dans un rayon de 18 m est empoisonnée pendant 1d4 heures.</td></tr>
+        <tr><td>69–70</td><td>Lumière vive dans un rayon de 9 m pendant 1 minute. Créature terminant son tour à 1,50 m = aveuglée jusqu'à son prochain tour.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">71–72</td><td><strong>Métamorphose</strong> sur vous-même. En cas d'échec au JS, vous devenez un mouton pour la durée du sort.</td></tr>
+        <tr><td>73–74</td><td>Papillons illusoires et pétales de fleurs dans un rayon de 3 m pendant 1 minute (aucun effet mécanique).</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">75–76</td><td>Vous pouvez immédiatement prendre une action supplémentaire.</td></tr>
+        <tr><td>77–78</td><td>Chaque créature dans un rayon de 9 m subit 1d10 dégâts nécrotiques. Vous récupérez autant de PV.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">79–80</td><td><strong>Image miroir</strong>.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">81–82</td><td><strong>Vol</strong> sur une créature aléatoire dans un rayon de 18 m.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">83–84</td><td>Vous devenez invisible jusqu'au début de votre prochain tour (ou jusqu'à ce que vous attaquiez ou lanciez un sort).</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">85–86</td><td>Si vous mourez dans la prochaine minute, vous revenez à la vie comme par <em>Réincarnation</em>.</td></tr>
+        <tr><td>87–88</td><td>Votre catégorie de taille augmente d'un cran pendant 1 minute.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">89–90</td><td>Vous et toutes les créatures dans un rayon de 9 m gagnez la vulnérabilité aux dégâts perforants pendant 1 minute.</td></tr>
+        <tr><td>91–92</td><td>Une musique éthérée vous entoure pendant 1 minute (aucun effet mécanique).</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">93–94</td><td>Vous récupérez votre emplacement de sort dépensé de plus bas niveau.</td></tr>
+        <tr><td style="color:#e53935;font-weight:600">95–96</td><td>Pendant 1 minute, vous devez crier quand vous parlez.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">97–98</td><td>Pendant 1 minute, à chaque sort lancé, le DD augmente de 2.</td></tr>
+        <tr><td style="color:var(--cp);font-weight:600">99–00</td><td><strong>Arrêt du temps</strong>.</td></tr>
+      </table>
       </div>
     </div>`)}
     ${ds('s-compendium',`<div class="regles-section">
