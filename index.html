@@ -601,6 +601,7 @@ async function toggleCampExpand(tableId,campId){
                 if(cdoc.id.endsWith('_mj'))continue;
                 const cdata=cdoc.data();
                 if(cdata.userId===t.mjId)continue;
+                if(cdata.ejectedFromCampaign)continue;
                 const charData=cdata.characterData||{};
                 const priv=charData.privacy||{name:true,hp:true,abilities:false,notes:false};
                 const uid=cdata.userId;
@@ -837,8 +838,44 @@ function openEditCampaign(tableId,campId){
     <div style="display:flex;gap:8px">
       <button class="btn" style="flex:1" onclick="closeModal()">Annuler</button>
       <button class="btn bac" style="flex:2" onclick="saveEditCampaign('${tableId}','${campId}')">💾 Sauvegarder</button>
+    </div>
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn" style="width:100%;color:#e53935;border-color:rgba(229,57,53,.35)" onclick="openDeleteCampaign('${tableId}','${campId}')">🗑 Supprimer cette campagne</button>
     </div>`);
 }
+function openDeleteCampaign(tableId,campId){
+  const t=_hubCache&&_hubCache.find(t=>t.id===tableId);
+  const c=t&&t.campaigns.find(c=>c.id===campId);
+  const campName=c?c.name:'cette campagne';
+  openModal(`<div class="pt" style="color:#e53935">🗑 Supprimer la campagne ?</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px">Vous êtes sur le point de supprimer :</div>
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;padding:8px 12px;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.3);border-radius:6px">${esc(campName)}</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.6">Cette action supprimera définitivement la campagne ainsi que <b style="color:var(--text2)">tous les personnages</b> créés par les joueurs dans cette campagne. Elle est <b style="color:#e53935">irréversible</b>.</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="openEditCampaign('${tableId}','${campId}')">← Retour</button>
+      <button class="btn" style="flex:2;color:#e53935;border-color:rgba(229,57,53,.5)" onclick="doDeleteCampaign('${tableId}','${campId}')">🗑 Confirmer la suppression</button>
+    </div>`);
+}
+async function doDeleteCampaign(tableId,campId){
+  closeModal();
+  try{
+    const charsSnap=await fbDb.collection('characters').where('campaignId','==',campId).get();
+    const batch=fbDb.batch();
+    const libCleanups=[];
+    charsSnap.docs.forEach(d=>{
+      const uid=d.data().userId;
+      if(uid)libCleanups.push(fbDb.collection('users').doc(uid).update({['charLib.'+campId]:firebase.firestore.FieldValue.delete()}).catch(()=>{}));
+      batch.delete(d.ref);
+    });
+    batch.delete(fbDb.collection('campaigns').doc(campId));
+    await batch.commit();
+    await Promise.all(libCleanups);
+    if(_hubCache){const t=_hubCache.find(t=>t.id===tableId);if(t)t.campaigns=t.campaigns.filter(c=>c.id!==campId);}
+    showToast('🗑 Campagne supprimée.');
+    renderHub();
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
+
 async function saveEditCampaign(tableId,campId){
   const desc=document.getElementById('editCampDesc').value.trim();
   const detailed=document.getElementById('editCampDetailedDesc').value.trim();
@@ -4701,6 +4738,7 @@ async function loadMJPlayersData(){
     for(const doc of snap.docs){
       if(doc.id.endsWith('_mj'))continue;
       const data=doc.data();
+      if(data.ejectedFromCampaign)continue;
       const charData=data.characterData||{};
       let playerName='Joueur';let avatar='⚔';
       try{const u=await fbDb.collection('users').doc(data.userId).get();if(u.exists){playerName=u.data().displayName||'Joueur';avatar=u.data().avatar||'⚔';}}catch(e){}
@@ -5235,9 +5273,9 @@ function mjModerationModal(idx){
   openModal(`<div class="pt" style="color:#e53935">🗑 Modération</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Joueur : <b>${playerName}</b> · Personnage : <b>${charName}</b></div>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn" style="background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.35);color:#e53935;text-align:left;padding:12px 14px;border-radius:8px" onclick="mjDeleteCharacter(${idx})">
-        <div style="font-weight:600;margin-bottom:3px">🗑 Supprimer le personnage</div>
-        <div style="font-size:11px;color:var(--text3)">Supprime <b>${charName}</b> de cette campagne uniquement. Le joueur reste membre de la table.</div>
+      <button class="btn" style="background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.35);color:#e53935;text-align:left;padding:12px 14px;border-radius:8px" onclick="mjKickCharacter(${idx})">
+        <div style="font-weight:600;margin-bottom:3px">↩ Retirer de la campagne</div>
+        <div style="font-size:11px;color:var(--text3)">Retire <b>${charName}</b> du roster MJ. Le personnage reste intact dans la bibliothèque du joueur — c'est à lui de le supprimer.</div>
       </button>
       <button class="btn" style="background:rgba(229,57,53,.15);border:1px solid rgba(229,57,53,.6);color:#e53935;text-align:left;padding:12px 14px;border-radius:8px" onclick="mjKickFromTable(${idx})">
         <div style="font-weight:600;margin-bottom:3px">🚫 Exclure de la table</div>
@@ -5247,13 +5285,13 @@ function mjModerationModal(idx){
     <div style="margin-top:14px;text-align:right"><button class="btn bsm" onclick="closeModal()">Annuler</button></div>`);
 }
 
-async function mjDeleteCharacter(idx){
+async function mjKickCharacter(idx){
   const pp=_mjPlayersData[idx];if(!pp)return;
   const charName=pp.charData&&pp.charData.charName||'?';
   closeModal();
   try{
-    await fbDb.collection('characters').doc(pp.docId).delete();
-    showToast(`✅ Personnage "${charName}" supprimé de la campagne.`);
+    await fbDb.collection('characters').doc(pp.docId).update({ejectedFromCampaign:true});
+    showToast('✅ '+(pp.playerName||'Joueur')+' retiré de la campagne. Son personnage reste dans sa bibliothèque.');
     await loadMJPlayersData();
     renderMJContent();
   }catch(e){showToast('❌ Erreur : '+e.message);}
