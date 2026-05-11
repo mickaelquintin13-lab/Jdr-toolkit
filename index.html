@@ -1769,6 +1769,10 @@ function migratePlayer(p){
   if(!p.combatCharges)p.combatCharges={};
   if(!p.weaponProfs)p.weaponProfs=[];
   if(!p.armorProfs)p.armorProfs=[];
+  if(!p.deathSaves||typeof p.deathSaves!=='object')p.deathSaves={success:0,fail:0};
+  if(p.deathSaves.success===undefined)p.deathSaves.success=0;
+  if(p.deathSaves.fail===undefined)p.deathSaves.fail=0;
+  if(p.equipPortrait===undefined)p.equipPortrait=null;
   // Correction maîtrises "non-métal" → valeurs propres
   p.weaponProfs=p.weaponProfs.map(pr=>pr.replace(' non-métal','').trim()).filter(Boolean);
   p.armorProfs=p.armorProfs.map(pr=>pr.replace(' non-métal','').trim()).filter(Boolean);
@@ -1867,6 +1871,19 @@ async function saveAll(){
 function P(){return state.players[state.activeIdx]||state.players[0];}
 function upd(k,v){P()[k]=v;}
 
+function autoGrow(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight+2,500)+'px';}
+function autoGrowAll(){document.querySelectorAll('textarea.fi').forEach(autoGrow);}
+
+let _spellLevelsOpen={};
+let _equipProfOpen={w:true,a:true};
+
+async function uploadEquipPortrait(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{upd('equipPortrait',e.target.result);render();};
+  reader.readAsDataURL(file);
+}
+
 // ═══════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════
@@ -1915,6 +1932,7 @@ function setTab(id){
   const el=document.getElementById('tabContent');if(!el)return;
   const map={perso:tabPerso,competences:tabCompetences,combat:tabCombat,equipement:tabEquipement,sac:tabSac,historique:tabHistorique,xp:tabXP,sorts:tabSorts,levelup:tabLevelUp,journal:tabJournal};
   el.innerHTML=(map[id]||tabPerso)(P());
+  setTimeout(autoGrowAll,0);
 }
 
 function renderTab(){
@@ -1923,6 +1941,7 @@ function renderTab(){
   if(!p.created){el.innerHTML=tabCreation(p);return;}
   const map={perso:tabPerso,competences:tabCompetences,combat:tabCombat,equipement:tabEquipement,sac:tabSac,historique:tabHistorique,xp:tabXP,sorts:tabSorts,levelup:tabLevelUp,journal:tabJournal};
   el.innerHTML=(map[state.activeTab]||tabPerso)(p);
+  setTimeout(autoGrowAll,0);
 }
 
 function switchPlayer(i){state.activeIdx=i;resetCS();render();}
@@ -2954,10 +2973,20 @@ function renderSpellList(p, combatOnly){
     byLvl[lv].push({...s,data,stableId:'spl_'+s.name.replace(/[^a-zA-Z0-9]/g,'_')});
   });
   if(!Object.keys(byLvl).length)return`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:8px">Aucun sort préparé.</div>`;
-  return Object.keys(byLvl).sort((a,b)=>a-b).map(lv=>`
+  const STAR_COLORS=['#ffd700','#4fc3f7','#81c784','#ff8a65','#ba68c8','#f06292','#4db6ac','#ff7043','#e57373','#ce93d8'];
+  return Object.keys(byLvl).sort((a,b)=>a-b).map(lv=>{
+    const lvInt=parseInt(lv);
+    const color=STAR_COLORS[Math.min(lvInt,9)];
+    const star=`<span style="color:${color};font-size:12px">★</span>`;
+    const lvLabel=lv==='0'?`${star} Sorts mineurs`:`${star} Niveau ${lv}`;
+    const isOpen=_spellLevelsOpen[lv]!==false;
+    return`
     <div style="margin-bottom:10px">
-      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border)">${lv==='0'?'⭐ Sorts mineurs':'✦ Niveau '+lv}</div>
-      ${byLvl[lv].map(s=>{
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="_spellLevelsOpen['${lv}']=!(_spellLevelsOpen['${lv}']!==false);render()">
+        <span>${lvLabel} <span style="color:var(--text3);font-size:9px">(${byLvl[lv].length})</span></span>
+        <span style="font-size:10px;color:var(--text3)">${isOpen?'▴':'▾'}</span>
+      </div>
+      ${isOpen?byLvl[lv].map(s=>{
         const d=s.data;
         const school=d?d.school:'';
         const castTime=d?d.castTime:'';
@@ -2995,11 +3024,12 @@ function renderSpellList(p, combatOnly){
                 ${d&&d.savingThrow?`<span style="font-size:11px;padding:2px 8px;background:rgba(200,168,75,.12);border-radius:8px;color:var(--cp)">JS ${esc(d.savingThrow)} DD ${spellDC}</span>`:''}
                 ${damage?`<button class="btn bsm" onclick="rollSpellPlayer('${esc(s.name)}','${esc(damage)}','${esc(d&&d.savingThrow||'')}')">🎲 Lancer ${esc(damage)}</button>`:''}
               </div>`:''}
-            `:'<p style="font-size:12px;color:var(--text3)">Données non disponibles. Chargez le compendium.</p>'}
+            `:`<p style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:8px">Données non disponibles. <button class="btn bsm" style="font-size:10px;padding:2px 8px" onclick="loadSpellsDB(()=>render())">Charger le compendium</button></p>`}
           </div>
         </div>`;
-      }).join('')}
-    </div>`).join('');
+      }).join(''):''}
+    </div>`;
+  }).join('');
 }
 
 function togglePrepareSpell(name){
@@ -3242,7 +3272,8 @@ function tabEquipement(p){
   </div>`;};
   const left=[{id:'head',label:'Tête',icon:'🪖'},{id:'shoulders',label:'Épaules',icon:'🧥'},{id:'chest',label:'Torse',icon:'🛡'},{id:'hands',label:'Mains',icon:'🧤'},{id:'legs',label:'Jambes',icon:'👖'}];
   const right=[{id:'neck',label:'Cou',icon:'📿'},{id:'ring1',label:'Anneau G',icon:'💍'},{id:'ring2',label:'Anneau D',icon:'💍'},{id:'waist',label:'Ceinture',icon:'🪢'},{id:'feet',label:'Pieds',icon:'👢'}];
-  const weapons=[{id:'mainhand',label:'Main droite',icon:'⚔️'},{id:'offhand',label:'Main gauche',icon:'🗡️'},{id:'back',label:'Cape/Dos',icon:'🧣'}];
+  const weapons=[{id:'mainhand',label:'Main droite',icon:'⚔️'},{id:'offhand',label:'Main gauche',icon:'🗡️'},{id:'ranged',label:'Distance',icon:'🏹'}];
+  const eqImg=p.equipPortrait||p.portrait;
 
   // Maîtrises armes & armures
   const allWeapons=[...SRD.weapons];
@@ -3253,9 +3284,10 @@ function tabEquipement(p){
     <div class="eq-layout">
       <div class="eq-col">${left.map(slotHtml).join('')}</div>
       <div>
-        <div class="eq-portrait" onclick="document.getElementById('eqPortInput').click()">${p.portrait?`<img src="${p.portrait}">`:`<div class="eq-portrait-hint">📷<br>Portrait<br>Cliquer</div>`}</div>
-        <input type="file" id="eqPortInput" accept="image/*" style="display:none" onchange="uploadPortrait(this)">
-        ${p.portrait?`<button class="btn bsm bdanger" style="width:100%;margin-top:4px" onclick="upd('portrait',null);render()">Supprimer</button>`:''}
+        <div class="eq-portrait" onclick="document.getElementById('eqEquipImgInput').click()" title="Image d'équipement (indépendante du portrait)">${eqImg?`<img src="${eqImg}">`:`<div class="eq-portrait-hint">📷<br>Image<br>Cliquer</div>`}</div>
+        <input type="file" id="eqEquipImgInput" accept="image/*" style="display:none" onchange="uploadEquipPortrait(this)">
+        ${eqImg?`<button class="btn bsm bdanger" style="width:100%;margin-top:4px" onclick="upd('equipPortrait',null);render()">Supprimer</button>`:''}
+        <div style="margin-top:8px">${slotHtml({id:'back',label:'Cape/Dos',icon:'🧣'})}</div>
       </div>
       <div class="eq-col">${right.map(slotHtml).join('')}</div>
     </div>
@@ -3263,8 +3295,12 @@ function tabEquipement(p){
 
     <!-- Maîtrises armes & armures -->
     <div class="g2" style="gap:10px">
-      <div class="panel"><div class="pt" style="display:flex;align-items:center;justify-content:space-between"><span>Maîtrises d'armes</span>${isMJ()?`<span style="font-size:10px;color:var(--cp)">🎲 clic pour toggle</span>`:''}</div>
-        ${allWeapons.map(w=>{
+      <div class="panel">
+        <div class="pt" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="_equipProfOpen.w=!_equipProfOpen.w;render()">
+          <span>Maîtrises d'armes</span>
+          <span style="display:flex;align-items:center;gap:8px">${isMJ()?`<span style="font-size:10px;color:var(--cp)">🎲 toggle</span>`:''}<span style="font-size:11px;color:var(--text3)">${_equipProfOpen.w?'▴':'▾'}</span></span>
+        </div>
+        ${_equipProfOpen.w?allWeapons.map(w=>{
           const prof=wProfs.some(pr=>pr.toLowerCase()===w.subtype.toLowerCase()||w.name.toLowerCase().includes(pr.toLowerCase()));
           return`<div class="prof-row" style="${isMJ()?'cursor:pointer':''}" onclick="${isMJ()?`mjToggleWeaponProf('${esc(w.subtype)}')`:''}" title="${isMJ()?'Cliquer pour modifier':''}">
             <span class="prof-dot ${prof?'yes':'no'}"></span>
@@ -3272,10 +3308,14 @@ function tabEquipement(p){
             <span style="font-size:10px;color:var(--text3)">${esc(w.subtype)}</span>
             ${prof?`<span style="font-size:10px;color:#4caf50">✓</span>`:`<span style="font-size:10px;color:#e53935">✗</span>`}
           </div>`;
-        }).join('')}
+        }).join(''):''}
       </div>
-      <div class="panel"><div class="pt" style="display:flex;align-items:center;justify-content:space-between"><span>Maîtrises d'armures</span>${isMJ()?`<span style="font-size:10px;color:var(--cp)">🎲 clic pour toggle</span>`:''}</div>
-        ${allArmors.map(a=>{
+      <div class="panel">
+        <div class="pt" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="_equipProfOpen.a=!_equipProfOpen.a;render()">
+          <span>Maîtrises d'armures</span>
+          <span style="display:flex;align-items:center;gap:8px">${isMJ()?`<span style="font-size:10px;color:var(--cp)">🎲 toggle</span>`:''}<span style="font-size:11px;color:var(--text3)">${_equipProfOpen.a?'▴':'▾'}</span></span>
+        </div>
+        ${_equipProfOpen.a?allArmors.map(a=>{
           const prof=aProfs.some(pr=>a.type.toLowerCase().includes(pr.toLowerCase())||a.name.toLowerCase().includes(pr.toLowerCase()));
           return`<div class="prof-row" style="${isMJ()?'cursor:pointer':''}" onclick="${isMJ()?`mjToggleArmorProf('${esc(a.type)}')`:''}" title="${isMJ()?'Cliquer pour modifier':''}">
             <span class="prof-dot ${prof?'yes':'no'}"></span>
@@ -3283,7 +3323,7 @@ function tabEquipement(p){
             <span style="font-size:10px;color:var(--text3)">${esc(a.type)}</span>
             ${prof?`<span style="font-size:10px;color:#4caf50">✓</span>`:`<span style="font-size:10px;color:#e53935">✗</span>`}
           </div>`;
-        }).join('')}
+        }).join(''):''}
       </div>
     </div>
   </div>`;
@@ -3320,6 +3360,20 @@ function mjToggleArmorProf(type){
 // ═══════════════════════════════════════
 function tabSac(p){
   const inv=p.inventory||[];const cur=p.currency||{pc:0,pa:0,pe:0,po:0,pp:0};
+  const invRows=inv.length?inv.map((item,i)=>`<div class="inv-item" style="flex-direction:column;align-items:flex-start;gap:4px">
+    <div style="display:flex;align-items:center;gap:8px;width:100%">
+      <span style="flex:1;font-size:13px;font-weight:600">${esc(item.name)}${item.magic?` <span class="magic-badge">✨${item.linkedTo?' '+esc(item.linkedTo):''}</span>`:''}</span>
+      <input type="number" min="0" value="${item.qty||1}" oninput="p.inventory[${i}].qty=parseInt(this.value)||0" style="width:48px;background:var(--surface3);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);text-align:center;outline:none">
+      <span onclick="removeInvItem(${i})" style="cursor:pointer;color:var(--text3);font-size:15px">×</span>
+    </div>
+    ${item.desc?`<div style="font-size:11px;color:var(--text3)">${esc(item.desc)}</div>`:''}
+    ${item.statBonuses&&item.statBonuses.length?`<div style="display:flex;gap:4px;flex-wrap:wrap">${item.statBonuses.map(b=>`<span class="status-badge ${b.value>0?'bonus':'malus'}" style="font-size:10px;padding:2px 6px">${b.stat.toUpperCase()} ${b.value>0?'+':''}${b.value}</span>`).join('')}</div>`:''}
+    ${item.charges?`<div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+      <span style="font-size:11px;color:var(--text3)">Charges:</span>
+      <div>${Array.from({length:item.charges},(_,ci)=>`<span class="slot-bubble${ci>=(item.chargesUsed||0)?'':' used'}" onclick="toggleItemCharge(${i},${ci})"></span>`).join('')}</div>
+      <span style="font-size:10px;color:var(--text3)">${item.charges-(item.chargesUsed||0)}/${item.charges}</span>
+    </div>`:''}
+  </div>`).join(''):`<div style="font-size:12px;color:var(--text3);font-style:italic">Inventaire vide.</div>`;
   return`<div class="g2" style="gap:10px">
   <div>
     <div class="panel mb10"><div class="pt">Monnaie</div>
@@ -3328,37 +3382,21 @@ function tabSac(p){
       </div>
     </div>
     <div class="panel">
-      <div class="pt" style="display:flex;align-items:center;justify-content:space-between">
+      <div class="pt" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span>Inventaire</span>
         ${isMJ()?`<button class="btn bsm bac" onclick="openMJCreateItem()">🎲 Créer objet/arme</button>`:''}
       </div>
-      ${!isMJ()?`<div style="display:flex;gap:6px;margin-bottom:10px"><input class="fi" id="invName" placeholder="Nom"><input class="fi" id="invDesc" placeholder="Description" style="flex:2"><button class="btn bsm bac" onclick="addInvItem()">+</button></div>`:''}
-      ${inv.length?inv.map((item,i)=>`<div class="inv-item" style="flex-direction:column;align-items:flex-start;gap:4px">
-        <div style="display:flex;align-items:center;gap:8px;width:100%">
-          <span style="flex:1;font-size:13px;font-weight:600">${esc(item.name)}${item.magic?` <span class="magic-badge">✨${item.linkedTo?' '+esc(item.linkedTo):''}</span>`:''}</span>
-          <input type="number" min="0" value="${item.qty||1}" oninput="p.inventory[${i}].qty=parseInt(this.value)||0" style="width:48px;background:var(--surface3);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);text-align:center;outline:none">
-          ${isMJ()?`<span onclick="removeInvItem(${i})" style="cursor:pointer;color:var(--text3);font-size:15px">×</span>`:''}
-        </div>
-        ${item.desc?`<div style="font-size:11px;color:var(--text3)">${esc(item.desc)}</div>`:''}
-        ${item.statBonuses&&item.statBonuses.length?`<div style="display:flex;gap:4px;flex-wrap:wrap">${item.statBonuses.map(b=>`<span class="status-badge ${b.value>0?'bonus':'malus'}" style="font-size:10px;padding:2px 6px">${b.stat.toUpperCase()} ${b.value>0?'+':''}${b.value}</span>`).join('')}</div>`:''}
-        ${item.charges?`<div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-          <span style="font-size:11px;color:var(--text3)">Charges:</span>
-          <div>${Array.from({length:item.charges},(_,ci)=>`<span class="slot-bubble${ci>=(item.chargesUsed||0)?'':' used'}" onclick="toggleItemCharge(${i},${ci})"></span>`).join('')}</div>
-          <span style="font-size:10px;color:var(--text3)">${item.charges-(item.chargesUsed||0)}/${item.charges}</span>
-        </div>`:''}
-      </div>`).join(''):`<div style="font-size:12px;color:var(--text3);font-style:italic">Inventaire vide.</div>`}
+      <div style="display:flex;gap:6px;margin-bottom:4px">
+        <input class="fi" id="invName" placeholder="${ITEMS_DB?'Nom ou recherche parmi '+ITEMS_DB.length.toLocaleString()+' objets...':'Nom ou recherche compendium...'}" oninput="filterSrdItems(this.value)" style="flex:1">
+        <button class="btn bsm bac" onclick="addInvItem()">+</button>
+      </div>
+      ${!ITEMS_DB?`<button class="btn bsm" style="font-size:11px;width:100%;margin-bottom:6px" onclick="loadItemsDB(()=>render())">📚 Charger le compendium (16 419 objets)</button>`:''}
+      <div id="srdList" style="margin-bottom:8px;max-height:220px;overflow-y:auto">${renderSrdList('')}</div>
+      ${invRows}
     </div>
   </div>
   <div>
-    <div class="panel">
-      <div class="pt" style="display:flex;align-items:center;justify-content:space-between">
-        <span>📚 Ajouter depuis le Compendium</span>
-        ${ITEMS_DB?`<span style="font-size:10px;color:var(--text3)">${ITEMS_DB.length.toLocaleString()} objets</span>`:`<button class="btn bsm bprimary" style="font-size:10px;padding:3px 8px" onclick="loadItemsDB(()=>render())">Charger (16 419 objets)</button>`}
-      </div>
-      <input class="fi" id="srdQ" placeholder="${ITEMS_DB?'Rechercher dans le compendium...':'Arme ou armure (SRD)...'}" oninput="filterSrdItems(this.value)" style="margin-bottom:6px">
-      <div id="srdList">${renderSrdList('')}</div>
-    </div>
-    ${isMJ()&&mjPool.customItems.length?`<div class="panel mt8">
+    ${isMJ()&&mjPool.customItems.length?`<div class="panel">
       <div class="pt">Objets personnalisés (pool MJ)</div>
       ${mjPool.customItems.slice(-10).map((item,i)=>`<div class="aci" onclick="addPoolItemToSac(${mjPool.customItems.length-10+i})">
         <div class="ain">${esc(item.name)}${item.magic?' ✨':''}</div>
@@ -3382,13 +3420,11 @@ function addPoolItemToSac(idx){
   render();showToast(`✓ "${item.name}" ajouté au sac`);
 }
 function addInvItem(){
-  const n=document.getElementById('invName')?.value;const d=document.getElementById('invDesc')?.value;
+  const el=document.getElementById('invName');const n=el?.value?.trim();
   if(!n)return;const p=P();if(!p.inventory)p.inventory=[];
-  const magic=document.getElementById('invMagic')?.checked||false;
-  const linkedTo=document.getElementById('invLinkedTo')?.value||'';
-  p.inventory.push({name:n,qty:1,desc:d||'',magic,linkedTo});
-  document.getElementById('invName').value='';document.getElementById('invDesc').value='';
-  document.getElementById('invMagic').checked=false;document.getElementById('invLinkedTo').value='';
+  p.inventory.push({name:n,qty:1,desc:'',magic:false,linkedTo:''});
+  if(el)el.value='';
+  const sl=document.getElementById('srdList');if(sl)sl.innerHTML='';
   render();
 }
 function removeInvItem(i){P().inventory.splice(i,1);render();}
@@ -3407,7 +3443,8 @@ function renderSrdList(q){
       <div class="ais">${esc(it.d||'')}${it.d1?' — '+it.d1+(it.d2?' / '+it.d2:'')+(it.dt?' '+it.dt:''):''}${it.ac?' — CA '+it.ac:''}</div>
     </div>`).join('');
   }
-  return[...SRD.weapons,...SRD.armors].filter(i=>!q||i.name.toLowerCase().includes(q.toLowerCase())).slice(0,12).map(i=>`<div class="aci" onclick="addSrdItem('${esc(i.name)}','${esc(i.damage||i.ca||'')}','${esc(i.subtype||i.type||'')}')"><div class="ain">${esc(i.name)}</div><div class="ais">${esc(i.damage||i.ca||'')} — ${esc(i.price||'')}</div></div>`).join('');
+  if(!q.trim())return'';
+  return[...SRD.weapons,...SRD.armors].filter(i=>i.name.toLowerCase().includes(q.toLowerCase())).slice(0,8).map(i=>`<div class="aci" onclick="addSrdItem('${esc(i.name)}','${esc(i.damage||i.ca||'')}','${esc(i.subtype||i.type||'')}')"><div class="ain">${esc(i.name)}</div><div class="ais">${esc(i.damage||i.ca||'')} — ${esc(i.price||'')}</div></div>`).join('');
 }
 function filterSrdItems(q){const el=document.getElementById('srdList');if(el)el.innerHTML=renderSrdList(q);}
 function addSrdItem(name,stats,type){const p=P();if(!p.inventory)p.inventory=[];p.inventory.push({name,qty:1,desc:`${type} — ${stats}`,magic:false,linkedTo:''});render();}
@@ -3661,25 +3698,25 @@ function tabHistorique(p){
     <div>
       <div class="panel mb10">
         <div class="pt">Traits de personnalité</div>
-        <div class="fl mb6">Trait</div><textarea class="fi mb6" rows="3" onchange="upd('traits',this.value)" style="resize:vertical">${esc(p.traits)}</textarea>
-        <div class="fl mb6">Idéaux</div><textarea class="fi mb6" rows="2" onchange="upd('ideals',this.value)" style="resize:vertical">${esc(p.ideals)}</textarea>
-        <div class="fl mb6">Liens</div><textarea class="fi mb6" rows="2" onchange="upd('bonds',this.value)" style="resize:vertical">${esc(p.bonds)}</textarea>
-        <div class="fl mb6">Défauts</div><textarea class="fi" rows="2" onchange="upd('flaws',this.value)" style="resize:vertical">${esc(p.flaws)}</textarea>
+        <div class="fl mb6">Trait</div><textarea class="fi mb6" rows="2" oninput="upd('traits',this.value);autoGrow(this)" style="resize:vertical">${esc(p.traits)}</textarea>
+        <div class="fl mb6">Idéaux</div><textarea class="fi mb6" rows="2" oninput="upd('ideals',this.value);autoGrow(this)" style="resize:vertical">${esc(p.ideals)}</textarea>
+        <div class="fl mb6">Liens</div><textarea class="fi mb6" rows="2" oninput="upd('bonds',this.value);autoGrow(this)" style="resize:vertical">${esc(p.bonds)}</textarea>
+        <div class="fl mb6">Défauts</div><textarea class="fi" rows="2" oninput="upd('flaws',this.value);autoGrow(this)" style="resize:vertical">${esc(p.flaws)}</textarea>
       </div>
       <div class="panel" style="border-color:rgba(200,168,75,.3);background:rgba(200,168,75,.04)">
         <div class="pt" style="color:var(--cp)">🔐 Secrets <span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:6px">Visible uniquement par toi et le MJ</span></div>
-        <textarea class="fi" rows="5" onchange="upd('secrets',this.value)" placeholder="Informations secrètes sur ton personnage, objectifs cachés, traumatismes, liens secrets avec des PNJ..." style="resize:vertical">${esc(p.secrets||'')}</textarea>
+        <textarea class="fi" rows="2" oninput="upd('secrets',this.value);autoGrow(this)" placeholder="Informations secrètes sur ton personnage, objectifs cachés, traumatismes, liens secrets avec des PNJ..." style="resize:vertical">${esc(p.secrets||'')}</textarea>
       </div>
     </div>
     <div>
       <div class="panel mb10">
         <div class="pt">Maîtrises & langues</div>
-        <div class="fl mb6">Maîtrises</div><textarea class="fi mb6" rows="3" onchange="upd('proficiencies',this.value)" style="resize:vertical">${esc(p.proficiencies)}</textarea>
-        <div class="fl mb6">Langues</div><textarea class="fi mb6" rows="2" onchange="upd('languages',this.value)" style="resize:vertical">${esc(p.languages)}</textarea>
+        <div class="fl mb6">Maîtrises</div><textarea class="fi mb6" rows="2" oninput="upd('proficiencies',this.value);autoGrow(this)" style="resize:vertical">${esc(p.proficiencies)}</textarea>
+        <div class="fl mb6">Langues</div><textarea class="fi mb6" rows="2" oninput="upd('languages',this.value);autoGrow(this)" style="resize:vertical">${esc(p.languages)}</textarea>
       </div>
       <div class="panel">
         <div class="pt">Backstory</div>
-        <textarea class="fi" rows="8" onchange="upd('backstory',this.value)" placeholder="L'histoire de ton personnage..." style="resize:vertical">${esc(p.backstory)}</textarea>
+        <textarea class="fi" rows="3" oninput="upd('backstory',this.value);autoGrow(this)" placeholder="L'histoire de ton personnage..." style="resize:vertical">${esc(p.backstory)}</textarea>
       </div>
     </div>
   </div>`;
