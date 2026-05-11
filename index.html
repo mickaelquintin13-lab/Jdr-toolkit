@@ -298,8 +298,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
   .pbar::-webkit-scrollbar{display:none}
   /* Modale */
   .modal-box{width:96%;padding:14px;max-height:92vh}
-  /* Portrait équipement centré en mobile */
-  .eq-portrait{max-width:140px;margin:0 auto}
+  /* Portrait équipement : remonté en premier sur mobile */
+  .eq-layout>div:nth-child(2){order:-1}
+  .eq-portrait{max-width:180px;margin:0 auto}
   /* Inventaire — wrap sur items larges */
   .inv-item{flex-wrap:wrap}
   /* Tables de règles */
