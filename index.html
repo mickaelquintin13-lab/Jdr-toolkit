@@ -410,6 +410,7 @@ let _compilationData=null;
 // MJ Screen state
 let _mjTab='joueurs';
 let _mjPlayersData=[];
+let _mjCustomFeats=[];
 let _mjCombatants=[];
 let _mjCombatStarted=false;
 let _mjCurrentTurn=0;
@@ -516,6 +517,7 @@ function openUserSettings(){
         <div style="font-size:11px;color:var(--text3)">${esc(c.charClass||'')} • ${esc(c.campaignName||'')} (${esc(c.tableName||'')})</div>
       </div>
       <span style="color:var(--cp);font-size:11px">Jouer →</span>
+      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-left:6px;flex-shrink:0" onclick="event.stopPropagation();deleteCharFromLib('${campId}')">🗑</button>
     </div>`).join('')
     :`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucun personnage sauvegardé.</div>`;
   openModal(`<div class="pt">⚙ Paramètres du profil</div>
@@ -596,7 +598,9 @@ async function toggleCampExpand(tableId,campId){
               const charsSnap=await fbDb.collection('characters').where('campaignId','==',campId).get();
               const participants=[];
               for(const cdoc of charsSnap.docs){
+                if(cdoc.id.endsWith('_mj'))continue;
                 const cdata=cdoc.data();
+                if(cdata.userId===t.mjId)continue;
                 const charData=cdata.characterData||{};
                 const priv=charData.privacy||{name:true,hp:true,abilities:false,notes:false};
                 const uid=cdata.userId;
@@ -682,15 +686,16 @@ function renderHubHTML(tables,isMJ){
         const charBlock=isMJ
           ?`<button class="btn bac" style="width:100%;margin-top:8px" onclick="enterCampaign('${t.id}','${c.id}')">🎲 Gérer cette campagne</button>`
           :(charInfo
-            ?`<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px;background:rgba(200,168,75,.06);border-radius:6px;border:1px solid rgba(200,168,75,.15)">
+            ?`<div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px;background:rgba(200,168,75,.06);border-radius:6px;border:1px solid rgba(200,168,75,.15)">
                 <span style="font-size:18px">${currentUserData&&currentUserData.avatar||'⚔'}</span>
-                <div><div style="font-size:13px;font-weight:600">${esc(charInfo.charName||'?')}</div><div style="font-size:11px;color:var(--text3)">${esc(charInfo.charClass||'')}</div></div>
-                <button class="btn bac bsm" style="margin-left:auto" onclick="enterCampaign('${t.id}','${c.id}')">▶ Jouer</button>
+                <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${esc(charInfo.charName||'?')}</div><div style="font-size:11px;color:var(--text3)">${esc(charInfo.charClass||'')}</div></div>
+                <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.35);flex-shrink:0" onclick="playerLeaveCharacter('${c.id}')">✕ Quitter</button>
+                <button class="btn bac bsm" style="flex-shrink:0" onclick="enterCampaign('${t.id}','${c.id}')">▶ Jouer</button>
               </div>`
             :`<button class="btn bprimary" style="width:100%;margin-top:8px" onclick="enterCampaign('${t.id}','${c.id}')">+ Créer mon personnage</button>`);
         const mjEditHtml=isMJ?`
           <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn bsm" onclick="openEditCampaign('${t.id}','${c.id}','${esc(c.name)}')">✏ Modifier</button>
+            <button class="btn bsm" onclick="openEditCampaign('${t.id}','${c.id}')">✏ Modifier</button>
           </div>`:'';
         expandedHtml=`<div class="camp-expanded">${imgHtml}
           ${c.detailedDesc?`<p style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:8px">${esc(c.detailedDesc)}</p>`:''}
@@ -813,11 +818,11 @@ async function confirmDeleteTable(tableId){
 }
 
 // ─── MODIFIER UNE CAMPAGNE (MJ) ───
-function openEditCampaign(tableId,campId,campName){
+function openEditCampaign(tableId,campId){
   const t=_hubCache&&_hubCache.find(t=>t.id===tableId);
   const c=t&&t.campaigns.find(c=>c.id===campId);
   if(!c)return;
-  openModal(`<div class="pt">✏ Modifier : ${esc(campName)}</div>
+  openModal(`<div class="pt">✏ Modifier : ${esc(c.name)}</div>
     <div class="fl mb6">Description courte</div>
     <input class="fi" id="editCampDesc" value="${esc(c.description||'')}" style="margin-bottom:10px">
     <div class="fl mb6">Description détaillée (ambiance, histoire...)</div>
@@ -895,6 +900,54 @@ async function doJoinTable(code){
   }catch(e){showToast('❌ Erreur : '+e.message);}
 }
 
+// ─── QUITTER UNE CAMPAGNE (JOUEUR) ───
+function playerLeaveCharacter(campId){
+  window._pendingLeave=campId;
+  openModal(`<div class="pt" style="color:#e53935">Quitter la campagne ?</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Votre personnage sera définitivement supprimé de cette campagne. Cette action est irréversible.</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="closeModal()">Annuler</button>
+      <button class="btn" style="flex:2;color:#e53935;border-color:rgba(229,57,53,.5)" onclick="confirmPlayerLeave()">✕ Confirmer</button>
+    </div>`);
+}
+async function confirmPlayerLeave(){
+  const campId=window._pendingLeave;
+  if(!campId||!currentUser)return;
+  closeModal();
+  try{
+    await fbDb.collection('characters').doc(currentUser.uid+'_'+campId).delete();
+    await fbDb.collection('users').doc(currentUser.uid).update({['charLib.'+campId]:firebase.firestore.FieldValue.delete()});
+    if(currentUserData&&currentUserData.charLib)delete currentUserData.charLib[campId];
+    showToast('✅ Personnage supprimé de la campagne.');
+    renderHub();
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
+
+// ─── SUPPRIMER DE LA BIBLIOTHÈQUE (JOUEUR) ───
+function deleteCharFromLib(campId){
+  const c=currentUserData&&currentUserData.charLib&&currentUserData.charLib[campId];
+  const charName=c&&c.charName||'ce personnage';
+  window._pendingDeleteLib=campId;
+  openModal(`<div class="pt" style="color:#e53935">🗑 Supprimer "${esc(charName)}" ?</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Ce personnage sera supprimé de votre bibliothèque et de la campagne. Cette action est irréversible.</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="closeModal()">Annuler</button>
+      <button class="btn" style="flex:2;color:#e53935;border-color:rgba(229,57,53,.5)" onclick="confirmDeleteCharLib()">🗑 Supprimer</button>
+    </div>`);
+}
+async function confirmDeleteCharLib(){
+  const campId=window._pendingDeleteLib;
+  if(!campId||!currentUser)return;
+  closeModal();
+  try{
+    await fbDb.collection('characters').doc(currentUser.uid+'_'+campId).delete();
+    await fbDb.collection('users').doc(currentUser.uid).update({['charLib.'+campId]:firebase.firestore.FieldValue.delete()});
+    if(currentUserData&&currentUserData.charLib)delete currentUserData.charLib[campId];
+    showToast('✅ Personnage supprimé.');
+    openUserSettings();
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
+
 // ─── COPIER LE LIEN ───
 function viewCharSheet(uid,campId){
   // Cherche les données du personnage dans le cache
@@ -961,6 +1014,7 @@ async function enterCampaign(tableId,campaignId,tName,cName){
       }catch(e){}
       showMJScreen();
       await loadMJPlayersData();
+      loadMJCustomFeats();
       renderMJContent();
       // Chargement silencieux des petits compendiums en arrière-plan
       loadFeatsDB();loadRacesDB();loadBackgroundsDB();loadClassesDB();
@@ -4330,6 +4384,7 @@ function selectBgPerso(name){upd('background',name);const inp=document.getElemen
 // ═══════════════════════════════════════
 function uploadPortrait(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{upd('portrait',e.target.result);render();};reader.readAsDataURL(file);}
 function openModal(html){const m=document.getElementById('modal');m.className='open';m.innerHTML=`<div class="modal-box" style="max-width:480px">${html}</div>`;}
+function openWideModal(html){const m=document.getElementById('modal');m.className='open';m.innerHTML=`<div class="modal-box" style="max-width:600px">${html}</div>`;}
 function closeModal(){const m=document.getElementById('modal');if(m){m.className='';m.innerHTML='';}}
 document.addEventListener('click',e=>{
   if(document.getElementById('modal')?.className==='open'&&e.target===document.getElementById('modal'))closeModal();
@@ -4681,6 +4736,7 @@ function mjTabJoueurs(){
       <div style="font-family:var(--F);font-size:12px;color:var(--cp)">${_mjPlayersData.length} joueur(s)</div>
       <div style="display:flex;gap:6px">
         <button class="btn bsm" onclick="loadMJPlayersData().then(()=>renderMJContent())">🔄 Actualiser</button>
+        <button class="btn bsm" onclick="mjOpenCompendium()">📚 Compendium</button>
         <button class="btn bsm bprimary" onclick="mjAddAllToCombat()">⚡ Tous en combat</button>
       </div>
     </div>
@@ -4702,6 +4758,7 @@ function mjTabJoueurs(){
             <div style="font-size:11px;color:var(--text3)">${esc(cls)} — Niv.${lvl} — ${esc(pp.playerName||'')}</div>
           </div>
           <button class="btn bsm" onclick="mjShowPlayerDetail(${i})">📋 Fiche</button>
+          <button class="btn bsm" onclick="mjEditPlayerSheet(${i})">✏ Modifier</button>
           <button class="btn bsm bprimary" onclick="mjAddPlayerToCombat(${i})">⚡ Combat</button>
           <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="mjModerationModal(${i})" title="Modérer ce joueur">🗑</button>
         </div>
@@ -4808,6 +4865,367 @@ function mjShowPlayerDetail(idx){
     ${(p.languages||p.proficiencies||(p.weaponProfs&&p.weaponProfs.length))?`<div style="font-size:11px;color:var(--text3);line-height:2">${p.languages?`🗣 <b>Langues :</b> <span style="color:var(--text2)">${esc(p.languages)}</span><br>`:''}${p.proficiencies?`📜 <b>Maîtrises :</b> <span style="color:var(--text2)">${esc(p.proficiencies)}</span><br>`:''}${p.weaponProfs&&p.weaponProfs.length?`⚔ <b>Armes :</b> <span style="color:var(--text2)">${p.weaponProfs.join(', ')}</span><br>`:''}${p.armorProfs&&p.armorProfs.length?`🛡 <b>Armures :</b> <span style="color:var(--text2)">${p.armorProfs.join(', ')}</span>`:''}</div>`:''}
   </div>
   <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn" onclick="closeModal()">Fermer</button></div>`);
+}
+
+// ─── MJ : ÉDITION DE LA FICHE JOUEUR ───────────────────────────────────────
+let _mjEditData=null;
+
+function _mjRenderInvList(inv){
+  if(!inv.length)return'<div style="font-size:11px;color:var(--text3);font-style:italic;padding:3px 0">Inventaire vide.</div>';
+  return inv.map((it,i)=>`<div style="display:flex;gap:5px;align-items:center;margin-bottom:4px">
+    <input type="number" id="mje_inv_qty_${i}" value="${it.qty||1}" min="1" style="width:42px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:3px;outline:none">
+    <input id="mje_inv_name_${i}" value="${esc(it.name||'')}" placeholder="Nom de l'objet" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:3px 6px;outline:none">
+    <button class="btn bsm" style="color:#e53935;padding:2px 7px;flex-shrink:0" onclick="mjEditRemoveInv(${i})">✕</button>
+  </div>`).join('');
+}
+
+function _mjRenderSpellList(spells){
+  if(!spells.length)return'<div style="font-size:11px;color:var(--text3);font-style:italic;padding:3px 0">Aucun sort.</div>';
+  return spells.map((s,i)=>`<div style="display:flex;gap:5px;align-items:center;margin-bottom:3px;padding:3px 6px;background:var(--surface2);border-radius:4px">
+    <span style="font-size:10px;color:var(--text3);min-width:18px;text-align:center">${s.level!=null?s.level:0}</span>
+    <span style="flex:1;font-size:12px">${esc(s.name||s)}</span>
+    <button class="btn bsm" style="color:#e53935;padding:1px 6px;font-size:11px" onclick="mjEditRemoveSpell(${i})">✕</button>
+  </div>`).join('');
+}
+
+function _mjReadInvFromDOM(){
+  const inv=_mjEditData.p.inventory||[];
+  return inv.map((it,i)=>({...it,
+    qty:parseInt(document.getElementById('mje_inv_qty_'+i)?.value)||1,
+    name:document.getElementById('mje_inv_name_'+i)?.value||it.name||''
+  }));
+}
+
+function mjEditAddCond(){
+  const input=document.getElementById('mje_cond_input');
+  const val=(input&&input.value||'').trim();if(!val)return;
+  _mjEditData.p.conditions=_mjEditData.p.conditions||[];
+  _mjEditData.p.conditions.push(val);input.value='';
+  const chips=document.getElementById('mje_cond_chips');
+  if(chips)chips.innerHTML=_mjEditData.p.conditions.map((c,i)=>`<span class="status-badge malus" style="cursor:pointer" onclick="mjEditRemoveCond(${i})">⚠ ${esc(c)} ✕</span>`).join('');
+}
+function mjEditRemoveCond(i){
+  (_mjEditData.p.conditions||[]).splice(i,1);
+  const chips=document.getElementById('mje_cond_chips');
+  const conds=_mjEditData.p.conditions||[];
+  if(chips)chips.innerHTML=conds.length?conds.map((c,j)=>`<span class="status-badge malus" style="cursor:pointer" onclick="mjEditRemoveCond(${j})">⚠ ${esc(c)} ✕</span>`).join(''):'<span style="font-size:11px;color:var(--text3);font-style:italic">Aucune condition.</span>';
+}
+function mjEditAddInv(){
+  _mjEditData.p.inventory=_mjReadInvFromDOM();
+  _mjEditData.p.inventory.push({qty:1,name:'',magic:false,desc:''});
+  const list=document.getElementById('mje_inv_list');
+  if(list)list.innerHTML=_mjRenderInvList(_mjEditData.p.inventory);
+}
+function mjEditRemoveInv(i){
+  const current=_mjReadInvFromDOM();current.splice(i,1);
+  _mjEditData.p.inventory=current;
+  const list=document.getElementById('mje_inv_list');
+  if(list)list.innerHTML=_mjRenderInvList(current);
+}
+function mjEditAddSpell(){
+  const name=(document.getElementById('mje_spell_name')?.value||'').trim();if(!name)return;
+  const level=parseInt(document.getElementById('mje_spell_level')?.value)||0;
+  _mjEditData.p.spells=_mjEditData.p.spells||[];
+  _mjEditData.p.spells.push({name,level});
+  if(document.getElementById('mje_spell_name'))document.getElementById('mje_spell_name').value='';
+  if(document.getElementById('mje_spell_level'))document.getElementById('mje_spell_level').value='';
+  const list=document.getElementById('mje_spell_list');
+  if(list)list.innerHTML=_mjRenderSpellList(_mjEditData.p.spells);
+}
+function mjEditRemoveSpell(i){
+  (_mjEditData.p.spells||[]).splice(i,1);
+  const list=document.getElementById('mje_spell_list');
+  if(list)list.innerHTML=_mjRenderSpellList(_mjEditData.p.spells||[]);
+}
+
+// ── Classes helpers ──
+function _mjRenderClassList(classes){
+  if(!classes.length)return'<div style="font-size:11px;color:var(--text3);font-style:italic;padding:3px 0">Aucune classe.</div>';
+  return classes.map((c,i)=>`<div style="display:flex;gap:5px;align-items:center;margin-bottom:4px">
+    <input id="mje_cls_name_${i}" value="${esc(c.name||'')}" placeholder="Nom de la classe" style="flex:2;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:3px 6px;outline:none">
+    <span style="font-size:11px;color:var(--text3);white-space:nowrap">Niv.</span>
+    <input type="number" id="mje_cls_level_${i}" value="${c.level||1}" min="1" max="20" style="width:46px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:3px;outline:none">
+    <button class="btn bsm" style="color:#e53935;padding:2px 7px;flex-shrink:0" onclick="mjEditRemoveClass(${i})">✕</button>
+  </div>`).join('');
+}
+function _mjReadClassFromDOM(){
+  const classes=_mjEditData.p.classes||[];
+  return classes.map((_,i)=>({name:document.getElementById('mje_cls_name_'+i)?.value||'',level:parseInt(document.getElementById('mje_cls_level_'+i)?.value)||1})).filter(c=>c.name);
+}
+function mjEditAddClass(){
+  _mjEditData.p.classes=_mjReadClassFromDOM();
+  _mjEditData.p.classes.push({name:'',level:1});
+  const list=document.getElementById('mje_class_list');
+  if(list)list.innerHTML=_mjRenderClassList(_mjEditData.p.classes);
+}
+function mjEditRemoveClass(i){
+  const current=_mjReadClassFromDOM();current.splice(i,1);
+  _mjEditData.p.classes=current;
+  const list=document.getElementById('mje_class_list');
+  if(list)list.innerHTML=_mjRenderClassList(current);
+}
+
+// ── Compétences helpers ──
+function _mjRenderSkillGrid(){
+  const sp=_mjEditData.p.skillProf||{};
+  const abNames=['FOR','DEX','CON','INT','SAG','CHA'];
+  return SKILLS.map(sk=>{
+    const prof=sp[sk.name]||0;
+    const icon=prof>=2?'◆':prof>=1?'●':'○';
+    const col=prof>=2?'var(--cp)':prof>=1?'var(--text)':'var(--text3)';
+    return`<div style="display:flex;align-items:center;gap:4px;padding:3px 5px;cursor:pointer;border-radius:4px;background:var(--surface2);user-select:none" onclick="mjEditToggleSkill('${sk.name}')">
+      <span style="font-size:12px;color:${col};width:14px;text-align:center">${icon}</span>
+      <span style="font-size:11px;flex:1;color:${prof?'var(--text)':'var(--text2)'}">${esc(sk.name)}</span>
+      <span style="font-size:9px;color:var(--text3)">${abNames[sk.ab]}</span>
+    </div>`;
+  }).join('');
+}
+function mjEditToggleSkill(name){
+  const sp=_mjEditData.p.skillProf=_mjEditData.p.skillProf||{};
+  sp[name]=((sp[name]||0)+1)%3;
+  const grid=document.getElementById('mje_skill_grid');
+  if(grid)grid.innerHTML=_mjRenderSkillGrid();
+}
+
+// ── Capacités helpers ──
+function _mjRenderFeatList(feats){
+  if(!feats.length)return'<div style="font-size:11px;color:var(--text3);font-style:italic;padding:3px 0">Aucune capacité.</div>';
+  return feats.map((f,i)=>`<div style="background:var(--surface2);border-radius:6px;padding:7px;margin-bottom:6px">
+    <div style="display:flex;gap:5px;align-items:center;margin-bottom:4px">
+      <input id="mje_feat_name_${i}" value="${esc(f.name||'')}" placeholder="Nom de la capacité *" style="flex:2;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;font-weight:600;padding:3px 6px;outline:none">
+      <input id="mje_feat_class_${i}" value="${esc(f.classe||'')}" placeholder="Classe" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text2);font-size:11px;padding:3px 6px;outline:none">
+      <button class="btn bsm" style="color:#e53935;padding:2px 7px;flex-shrink:0" onclick="mjEditRemoveFeat(${i})">✕</button>
+    </div>
+    <textarea id="mje_feat_desc_${i}" rows="2" placeholder="Description (optionnelle)" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text2);font-size:11px;padding:4px 6px;resize:vertical;outline:none">${esc(f.desc||'')}</textarea>
+  </div>`).join('');
+}
+function _mjReadFeatsFromDOM(){
+  const feats=_mjEditData.p.features||[];
+  return feats.map((_,i)=>({name:document.getElementById('mje_feat_name_'+i)?.value||'',classe:document.getElementById('mje_feat_class_'+i)?.value||'',desc:document.getElementById('mje_feat_desc_'+i)?.value||''})).filter(f=>f.name);
+}
+function mjEditAddFeat(){
+  _mjEditData.p.features=_mjReadFeatsFromDOM();
+  _mjEditData.p.features.push({name:'',classe:'',desc:''});
+  const list=document.getElementById('mje_feat_list');
+  if(list)list.innerHTML=_mjRenderFeatList(_mjEditData.p.features);
+}
+function mjEditRemoveFeat(i){
+  const current=_mjReadFeatsFromDOM();current.splice(i,1);
+  _mjEditData.p.features=current;
+  const list=document.getElementById('mje_feat_list');
+  if(list)list.innerHTML=_mjRenderFeatList(current);
+}
+
+// ── Compendium personnalisé ──
+async function loadMJCustomFeats(){
+  if(!currentUser)return;
+  try{const doc=await fbDb.collection('users').doc(currentUser.uid).get();_mjCustomFeats=(doc.exists&&doc.data().customFeats)||[];}catch(e){_mjCustomFeats=[];}
+}
+async function saveMJCustomFeats(){
+  if(!currentUser)return;
+  try{await fbDb.collection('users').doc(currentUser.uid).update({customFeats:_mjCustomFeats});}
+  catch(e){showToast('❌ Erreur sauvegarde compendium.');}
+}
+function _mjRenderCompendiumList(){
+  if(!_mjCustomFeats.length)return'<div style="font-size:12px;color:var(--text3);font-style:italic;text-align:center;padding:20px">Aucune entrée. Créez votre première capacité ci-dessus.</div>';
+  return _mjCustomFeats.map((f,i)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px">
+    <div style="display:flex;align-items:flex-start;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(f.name)}</div>
+        ${f.category?`<div style="font-size:11px;color:var(--cp);margin-bottom:3px">${esc(f.category)}</div>`:''}
+        ${f.description?`<div style="font-size:12px;color:var(--text2);line-height:1.4">${esc(f.description)}</div>`:''}
+      </div>
+      <button class="btn bsm" style="color:#e53935;padding:2px 7px;flex-shrink:0" onclick="mjDeleteCustomFeat(${i})">🗑</button>
+    </div>
+  </div>`).join('');
+}
+function mjOpenCompendium(){
+  openWideModal(`<div class="pt">📚 Compendium personnalisé</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Créez et sauvegardez vos capacités, dons et traits maison. Ils seront disponibles pour tous vos personnages.</div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">+ Nouvelle entrée</div>
+      <input id="mj_comp_name" class="fi" placeholder="Nom *" style="margin-bottom:6px;font-size:13px;font-weight:600">
+      <input id="mj_comp_cat" class="fi" placeholder="Catégorie (ex : Racial, Magie, Roublard...)" style="margin-bottom:6px;font-size:12px">
+      <textarea id="mj_comp_desc" class="fi" rows="3" placeholder="Description de la capacité..." style="font-size:12px;resize:vertical;margin-bottom:8px"></textarea>
+      <button class="btn bsm bprimary" onclick="mjCreateCustomFeat()">💾 Ajouter au compendium</button>
+    </div>
+    <div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${_mjCustomFeats.length} entrée(s)</div>
+    <div id="mj_comp_list" style="max-height:40vh;overflow-y:auto">${_mjRenderCompendiumList()}</div>
+    <div style="text-align:right;margin-top:12px"><button class="btn bsm" onclick="closeModal()">Fermer</button></div>`);
+}
+async function mjCreateCustomFeat(){
+  const name=(document.getElementById('mj_comp_name')?.value||'').trim();
+  if(!name){showToast('❌ Le nom est obligatoire.');return;}
+  const category=(document.getElementById('mj_comp_cat')?.value||'').trim();
+  const description=(document.getElementById('mj_comp_desc')?.value||'').trim();
+  _mjCustomFeats.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),name,category,description});
+  await saveMJCustomFeats();
+  showToast('✅ "'+name+'" ajouté au compendium !');
+  if(document.getElementById('mj_comp_name'))document.getElementById('mj_comp_name').value='';
+  if(document.getElementById('mj_comp_cat'))document.getElementById('mj_comp_cat').value='';
+  if(document.getElementById('mj_comp_desc'))document.getElementById('mj_comp_desc').value='';
+  const list=document.getElementById('mj_comp_list');
+  if(list)list.innerHTML=_mjRenderCompendiumList();
+}
+async function mjDeleteCustomFeat(i){
+  _mjCustomFeats.splice(i,1);
+  await saveMJCustomFeats();
+  const list=document.getElementById('mj_comp_list');
+  if(list)list.innerHTML=_mjRenderCompendiumList();
+}
+function _mjSnapshotEditData(){
+  if(!_mjEditData)return;
+  const p=_mjEditData.p;
+  const getNum=id=>parseInt(document.getElementById(id)?.value)||0;
+  const getVal=id=>document.getElementById(id)?.value||'';
+  if(document.getElementById('mje_charname'))p.charName=getVal('mje_charname')||p.charName;
+  if(document.getElementById('mje_race'))p.race=getVal('mje_race');
+  if(document.getElementById('mje_background'))p.background=getVal('mje_background');
+  if(document.getElementById('mje_cls_name_0'))p.classes=_mjReadClassFromDOM();
+  if(document.getElementById('mje_hp'))p.hp=getNum('mje_hp');
+  if(document.getElementById('mje_hpMax'))p.hpMax=getNum('mje_hpMax')||1;
+  if(document.getElementById('mje_ac'))p.ac=getNum('mje_ac')||10;
+  if(document.getElementById('mje_speed'))p.speed=getNum('mje_speed')||9;
+  if(document.getElementById('mje_ab0'))p.abilities=[0,1,2,3,4,5].map(i=>parseInt(document.getElementById('mje_ab'+i)?.value)||10);
+  if(document.getElementById('mje_feat_name_0')||(_mjEditData.p.features&&_mjEditData.p.features.length===0))p.features=_mjReadFeatsFromDOM();
+  if(document.getElementById('mje_inv_name_0')||(_mjEditData.p.inventory&&_mjEditData.p.inventory.length===0))p.inventory=_mjReadInvFromDOM();
+  p.currency=p.currency||{};
+  ['pp','po','pe','pa','pc'].forEach(coin=>{if(document.getElementById('mje_cur_'+coin))p.currency[coin]=parseInt(document.getElementById('mje_cur_'+coin).value)||0;});
+  if(document.getElementById('mje_weaponprofs')){const v=getVal('mje_weaponprofs');p.weaponProfs=v?v.split(',').map(s=>s.trim()).filter(Boolean):[];}
+  if(document.getElementById('mje_armorprofs')){const v=getVal('mje_armorprofs');p.armorProfs=v?v.split(',').map(s=>s.trim()).filter(Boolean):[];}
+  ['languages','proficiencies','traits','ideals','bonds','flaws','backstory','secrets'].forEach(k=>{if(document.getElementById('mje_'+k))p[k]=getVal('mje_'+k);});
+}
+function mjOpenFeatPicker(playerIdx){
+  _mjSnapshotEditData();
+  if(!_mjCustomFeats.length){showToast('Compendium vide — créez des capacités d\'abord via le bouton 📚 Compendium.');return;}
+  openWideModal(`<div class="pt">📚 Importer depuis le compendium</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Cliquez sur une capacité pour l'ajouter à la fiche du personnage.</div>
+    <div style="max-height:60vh;overflow-y:auto;margin-bottom:10px">
+      ${_mjCustomFeats.map((f,i)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cp)'" onmouseout="this.style.borderColor='var(--border)'" onclick="mjApplyCustomFeat(${i},${playerIdx})">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">${esc(f.name)}</div>
+            ${f.category?`<div style="font-size:11px;color:var(--cp)">${esc(f.category)}</div>`:''}
+            ${f.description?`<div style="font-size:12px;color:var(--text2);margin-top:3px">${esc(f.description).substring(0,120)}${f.description.length>120?'…':''}</div>`:''}
+          </div>
+          <span style="font-size:18px;color:var(--cp)">+</span>
+        </div>
+      </div>`).join('')}
+    </div>
+    <div style="text-align:right"><button class="btn bsm" onclick="mjEditPlayerSheet(${playerIdx})">← Retour à la fiche</button></div>`);
+}
+function mjApplyCustomFeat(featIdx,playerIdx){
+  const f=_mjCustomFeats[featIdx];if(!f||!_mjEditData)return;
+  _mjEditData.p.features=_mjEditData.p.features||[];
+  _mjEditData.p.features.push({name:f.name,classe:f.category||'',desc:f.description||''});
+  mjEditPlayerSheet(playerIdx);
+}
+
+// ── Modale principale ──
+function mjEditPlayerSheet(idx){
+  const pp=_mjPlayersData[idx];if(!pp)return;
+  if(!_mjEditData||_mjEditData.idx!==idx){
+    _mjEditData={idx,p:JSON.parse(JSON.stringify(pp.charData||{}))};
+  }
+  const p=_mjEditData.p;
+  const abilNames=['FOR','DEX','CON','INT','SAG','CHA'];
+  const abs=p.abilities||[10,10,10,10,10,10];
+  const conds=p.conditions||[];
+  const inv=p.inventory||[];
+  const cur=p.currency||{};
+  const spells=p.spells||[];
+  const classes=p.classes||[];
+  const feats=p.features||[];
+  const sec=t=>`<div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);margin-bottom:8px;padding-bottom:3px;margin-top:4px">${t}</div>`;
+  openWideModal(`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <span style="font-size:24px">${pp.avatar||'⚔'}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:4px">${esc(pp.playerName||'')} · ✏ Modification de la fiche</div>
+      <input id="mje_charname" value="${esc(p.charName||'')}" placeholder="Nom du personnage" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;font-weight:700;outline:none;padding:2px 0">
+    </div>
+  </div>
+  <div style="max-height:65vh;overflow-y:auto;padding-right:4px">
+    ${sec('Infos de base')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Race</div><input id="mje_race" value="${esc(p.race||'')}" placeholder="Race" class="fi" style="font-size:12px"></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Historique</div><input id="mje_background" value="${esc(p.background||'')}" placeholder="Historique" class="fi" style="font-size:12px"></div>
+    </div>
+    ${sec('Classes & Niveaux')}
+    <div id="mje_class_list" style="margin-bottom:4px">${_mjRenderClassList(classes)}</div>
+    <button class="btn bsm" style="width:100%;margin-bottom:12px" onclick="mjEditAddClass()">+ Ajouter une classe</button>
+    ${sec('Stats de combat')}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">
+      ${[['PV','hp',p.hp||0],['PV max','hpMax',p.hpMax||1],['CA','ac',p.ac||10],['Vit. (m)','speed',p.speed||9]].map(([label,id,val])=>`<div style="background:var(--surface2);border-radius:6px;padding:6px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:3px">${label}</div><input id="mje_${id}" type="number" value="${val}" style="width:100%;text-align:center;background:transparent;border:none;color:var(--text);font-size:15px;font-weight:700;outline:none"></div>`).join('')}
+    </div>
+    ${sec('Caractéristiques')}
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:12px">
+      ${abilNames.map((ab,i)=>`<div style="background:var(--surface2);border-radius:6px;padding:5px;text-align:center"><div style="font-size:9px;color:var(--text3)">${ab}</div><input id="mje_ab${i}" type="number" min="1" max="30" value="${abs[i]}" style="width:100%;text-align:center;background:transparent;border:none;color:var(--text);font-size:14px;font-weight:700;outline:none"></div>`).join('')}
+    </div>
+    ${sec('Compétences')}
+    <div style="font-size:10px;color:var(--text3);margin-bottom:6px">Cliquer pour changer : ○ Aucune · ● Maîtrise · ◆ Expertise</div>
+    <div id="mje_skill_grid" style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:12px">${_mjRenderSkillGrid()}</div>
+    ${sec('Conditions')}
+    <div id="mje_cond_chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${conds.length?conds.map((c,i)=>`<span class="status-badge malus" style="cursor:pointer" onclick="mjEditRemoveCond(${i})">⚠ ${esc(c)} ✕</span>`).join(''):'<span style="font-size:11px;color:var(--text3);font-style:italic">Aucune condition.</span>'}</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px"><input id="mje_cond_input" class="fi" placeholder="Nom de la condition..." style="flex:1;font-size:12px;padding:5px 8px"><button class="btn bsm" onclick="mjEditAddCond()">+ Ajouter</button></div>
+    ${sec('Capacités & Dons')}
+    <div id="mje_feat_list" style="margin-bottom:4px">${_mjRenderFeatList(feats)}</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="btn bsm" style="flex:1" onclick="mjEditAddFeat()">+ Nouvelle</button>
+      <button class="btn bsm" style="flex:1" onclick="mjOpenFeatPicker(${idx})">📚 Depuis le compendium</button>
+    </div>
+    ${sec('Inventaire')}
+    <div id="mje_inv_list" style="margin-bottom:4px">${_mjRenderInvList(inv)}</div>
+    <button class="btn bsm" style="width:100%;margin-bottom:12px" onclick="mjEditAddInv()">+ Ajouter un objet</button>
+    ${sec('Monnaie')}
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      ${['pp','po','pe','pa','pc'].map(coin=>`<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">${coin.toUpperCase()}</div><input id="mje_cur_${coin}" type="number" min="0" value="${cur[coin]||0}" style="width:100%;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;padding:4px;outline:none"></div>`).join('')}
+    </div>
+    ${sec('Sorts')}
+    <div id="mje_spell_list" style="margin-bottom:6px">${_mjRenderSpellList(spells)}</div>
+    <div style="display:flex;gap:4px;margin-bottom:12px">
+      <input id="mje_spell_name" class="fi" placeholder="Nom du sort" style="flex:3;font-size:12px;padding:5px 8px">
+      <input id="mje_spell_level" type="number" min="0" max="9" placeholder="Niv" style="width:52px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px;font-size:12px;text-align:center;outline:none">
+      <button class="btn bsm" onclick="mjEditAddSpell()">+ Sort</button>
+    </div>
+    ${sec('Langues & Maîtrises')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Langues</div><input id="mje_languages" value="${esc(p.languages||'')}" class="fi" style="font-size:12px" placeholder="Commun, Elfique..."></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Maîtrises diverses</div><input id="mje_proficiencies" value="${esc(p.proficiencies||'')}" class="fi" style="font-size:12px" placeholder="Outils, instruments..."></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Maîtrises d'armes</div><input id="mje_weaponprofs" value="${esc((p.weaponProfs||[]).join(', '))}" class="fi" style="font-size:12px" placeholder="Armes courantes, épée..."></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Maîtrises d'armures</div><input id="mje_armorprofs" value="${esc((p.armorProfs||[]).join(', '))}" class="fi" style="font-size:12px" placeholder="Légères, intermédiaires..."></div>
+    </div>
+    ${sec('Personnalité & Histoire')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Traits</div><textarea id="mje_traits" class="fi" rows="2" style="font-size:11px;resize:vertical">${esc(p.traits||'')}</textarea></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Idéaux</div><textarea id="mje_ideals" class="fi" rows="2" style="font-size:11px;resize:vertical">${esc(p.ideals||'')}</textarea></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Liens</div><textarea id="mje_bonds" class="fi" rows="2" style="font-size:11px;resize:vertical">${esc(p.bonds||'')}</textarea></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Défauts</div><textarea id="mje_flaws" class="fi" rows="2" style="font-size:11px;resize:vertical">${esc(p.flaws||'')}</textarea></div>
+    </div>
+    <div style="margin-bottom:6px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Histoire du personnage</div><textarea id="mje_backstory" class="fi" rows="3" style="font-size:11px;resize:vertical">${esc(p.backstory||'')}</textarea></div>
+    <div style="margin-bottom:10px"><div style="font-size:10px;color:var(--cp);margin-bottom:3px">🔐 Secrets MJ</div><textarea id="mje_secrets" class="fi" rows="2" style="font-size:11px;resize:vertical;border-color:rgba(200,168,75,.35)">${esc(p.secrets||'')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+    <button class="btn bsm" onclick="closeModal()">Annuler</button>
+    <button class="btn bsm bprimary" onclick="mjSavePlayerSheet(${idx})">💾 Sauvegarder</button>
+  </div>`);
+}
+
+async function mjSavePlayerSheet(idx){
+  if(!_mjEditData)return;
+  const pp=_mjPlayersData[idx];if(!pp)return;
+  _mjSnapshotEditData();
+  const p=_mjEditData.p;
+  try{
+    await fbDb.collection('characters').doc(pp.docId).update({
+      characterData:p,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    pp.charData=p;
+    _mjEditData=null;
+    closeModal();
+    showToast('✅ Fiche de '+esc(pp.playerName||'joueur')+' mise à jour !');
+    renderMJContent();
+  }catch(e){showToast('❌ Erreur : '+e.message);}
 }
 
 function mjModerationModal(idx){
