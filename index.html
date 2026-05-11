@@ -257,6 +257,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .regles-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px}
 .regles-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
 .regles-table th{text-align:left;padding:5px 8px;color:var(--cp);font-family:var(--F);font-size:11px;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+.mj-rules-section{position:relative;transition:opacity .15s;}
+.mj-rules-section.mj-dragging{opacity:.35;}
+.mj-rules-section.mj-drop-before{border-top:3px solid var(--cp)!important;margin-top:-2px;}
+.mj-rules-section.mj-drop-after{border-bottom:3px solid var(--cp)!important;margin-bottom:-2px;}
+.mj-drag-handle{cursor:grab;color:var(--text3);font-size:13px;padding:2px 5px;border-radius:4px;user-select:none;flex-shrink:0;}
+.mj-drag-handle:hover{background:rgba(200,168,75,.12);color:var(--cp);}
 .regles-table td{padding:5px 8px;color:var(--text2);border-bottom:1px solid rgba(46,50,64,.4)}
 .regles-table tr:last-child td{border-bottom:none}
 .regles-table tr:hover td{background:var(--surface2)}
@@ -4629,7 +4635,7 @@ function renderMJContent(){
   else if(_mjTab==='pnj') el.innerHTML=mjTabPNJ();
   else if(_mjTab==='objets') el.innerHTML=mjTabObjets();
   else if(_mjTab==='journal') el.innerHTML=mjTabJournalScreen();
-  else if(_mjTab==='regles') el.innerHTML=mjTabRegles();
+  else if(_mjTab==='regles'){el.innerHTML=mjTabRegles();mjInitRulesDnD();}
 }
 
 // ── Chargement des joueurs de la campagne ──
@@ -4695,7 +4701,7 @@ function mjTabJoueurs(){
             <div style="font-size:14px;font-weight:600;color:var(--text)">${esc(p.charName||'?')}</div>
             <div style="font-size:11px;color:var(--text3)">${esc(cls)} — Niv.${lvl} — ${esc(pp.playerName||'')}</div>
           </div>
-          <button class="btn bsm" onclick="viewCharSheet('${pp.uid}','${currentCampaignId}')">📋 Fiche</button>
+          <button class="btn bsm" onclick="mjShowPlayerDetail(${i})">📋 Fiche</button>
           <button class="btn bsm bprimary" onclick="mjAddPlayerToCombat(${i})">⚡ Combat</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
@@ -4719,7 +4725,6 @@ function mjTabJoueurs(){
         </div>
         ${conds.length?`<div style="margin-bottom:6px">${conds.map(c=>`<span class="status-badge malus">⚠ ${esc(c)}</span>`).join('')}</div>`:''}
         ${p.secrets?`<div style="padding:8px;background:rgba(200,168,75,.06);border:1px solid rgba(200,168,75,.2);border-radius:6px;font-size:12px;color:var(--text2)"><span style="color:var(--cp);font-size:11px">🔐 Secret :</span> ${esc(p.secrets)}</div>`:''}
-        <div style="margin-top:8px"><button class="btn bsm" style="width:100%" onclick="mjShowPlayerDetail(${i})">📋 Plus de détails</button></div>
       </div>`;
     }).join('')}
   </div>`;
@@ -5340,12 +5345,44 @@ function mjTabJournalScreen(){
 }
 
 // ─────────────────────────────────────────
+// RÈGLES — DRAG & DROP
+// ─────────────────────────────────────────
+let _mjDragRuleId=null;
+function getMjRulesOrder(){try{const o=localStorage.getItem('mj_rules_order');if(o)return JSON.parse(o);}catch(e){}return[];}
+function saveMjRulesOrder(){const c=document.getElementById('mjRulesContainer');if(!c)return;localStorage.setItem('mj_rules_order',JSON.stringify([...c.querySelectorAll(':scope>[data-ruleid]')].map(e=>e.dataset.ruleid)));}
+function mjInitRulesDnD(){
+  const c=document.getElementById('mjRulesContainer');if(!c)return;
+  const order=getMjRulesOrder();if(!order.length)return;
+  const map={};c.querySelectorAll(':scope>[data-ruleid]').forEach(e=>map[e.dataset.ruleid]=e);
+  order.forEach(id=>{if(map[id])c.appendChild(map[id]);});
+}
+function mjRuleDragStart(id,el){_mjDragRuleId=id;setTimeout(()=>el.classList.add('mj-dragging'),0);}
+function mjRuleDragEnd(el){el.classList.remove('mj-dragging');document.querySelectorAll('.mj-drop-before,.mj-drop-after').forEach(x=>x.classList.remove('mj-drop-before','mj-drop-after'));}
+function mjRuleDragOver(e,el){
+  e.preventDefault();if(!_mjDragRuleId||el.dataset.ruleid===_mjDragRuleId)return;
+  document.querySelectorAll('.mj-drop-before,.mj-drop-after').forEach(x=>x.classList.remove('mj-drop-before','mj-drop-after'));
+  const r=el.getBoundingClientRect();el.classList.add(e.clientY<r.top+r.height/2?'mj-drop-before':'mj-drop-after');
+}
+function mjRuleDrop(e,targetId){
+  e.preventDefault();if(!_mjDragRuleId||_mjDragRuleId===targetId)return;
+  const c=document.getElementById('mjRulesContainer');
+  const dragged=c.querySelector('[data-ruleid="'+_mjDragRuleId+'"]');
+  const target=c.querySelector('[data-ruleid="'+targetId+'"]');
+  if(!dragged||!target)return;
+  c.insertBefore(dragged,target.classList.contains('mj-drop-before')?target:target.nextSibling);
+  target.classList.remove('mj-drop-before','mj-drop-after');
+  saveMjRulesOrder();_mjDragRuleId=null;
+}
+
+// ─────────────────────────────────────────
 // TAB RÈGLES
 // ─────────────────────────────────────────
 function mjTabRegles(){
-  return`<div>
-    <div class="regles-section">
-      <div class="pt">⚔ Actions en combat</div>
+  function ds(id,html){return`<div class="mj-rules-section" data-ruleid="${id}" draggable="true" ondragstart="mjRuleDragStart('${id}',this)" ondragend="mjRuleDragEnd(this)" ondragover="mjRuleDragOver(event,this)" ondrop="mjRuleDrop(event,'${id}')">${html}</div>`;}
+  function dh(title){return`<div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Glisser pour réorganiser">⠿</span>${title}</div>`;}
+  return`<div id="mjRulesContainer">
+    ${ds('s-actions',`<div class="regles-section">
+      ${dh('⚔ Actions en combat')}
       <table class="regles-table">
         <tr><th>Action</th><th>Description</th></tr>
         <tr><td><strong>Attaquer</strong></td><td>1 attaque (arme ou à mains nues). Certaines classes = 2 attaques au niv.5.</td></tr>
@@ -5357,10 +5394,9 @@ function mjTabRegles(){
         <tr><td><strong>Se cacher</strong></td><td>Jet de Discrétion contre la Perception passive des ennemis.</td></tr>
         <tr><td><strong>Improviser</strong></td><td>Toute action non listée, décidée par le MJ.</td></tr>
       </table>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">🎲 Difficulté (DC) suggérée</div>
+    </div>`)}
+    ${ds('s-dc',`<div class="regles-section">
+      ${dh('🎲 Difficulté (DC) suggérée')}
       <table class="regles-table">
         <tr><th>Difficulté</th><th>DC</th><th>Exemple</th></tr>
         <tr><td>Très facile</td><td><strong style="color:var(--cp)">5</strong></td><td>Escalader un mur avec des prises</td></tr>
@@ -5370,10 +5406,9 @@ function mjTabRegles(){
         <tr><td>Très difficile</td><td><strong style="color:var(--cp)">25</strong></td><td>Repérer une porte secrète bien cachée</td></tr>
         <tr><td>Quasi-impossible</td><td><strong style="color:var(--cp)">30</strong></td><td>Défoncer une porte de pierre renforcée à mains nues</td></tr>
       </table>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">😵 Conditions</div>
+    </div>`)}
+    ${ds('s-conditions',`<div class="regles-section">
+      ${dh('😵 Conditions')}
       <table class="regles-table">
         <tr><th>Condition</th><th>Effets principaux</th></tr>
         <tr><td><strong>Aveuglé</strong></td><td>Rate automatiquement tout ce qui demande la vue. Attaques en désavantage, contre lui en avantage.</td></tr>
@@ -5389,8 +5424,8 @@ function mjTabRegles(){
         <tr><td><strong>Épuisé</strong></td><td>6 niveaux. Désavantages, -Vitesse, -PV max, jusqu'à la mort au niveau 6.</td></tr>
         <tr><td><strong>Invisible</strong></td><td>Introuvable sans Perception. Attaques en avantage, contre lui en désavantage.</td></tr>
       </table>
-    </div>
-
+    </div>`)}
+    ${ds('s-couverture',`<div style="display:flex;align-items:center;gap:6px;padding:4px 0 8px;color:var(--text3);font-size:11px"><span class="mj-drag-handle" title="Glisser pour réorganiser">⠿</span>Couverture &amp; Attaques spéciales</div>
     <div class="g2" style="gap:10px">
       <div class="regles-section">
         <div class="pt">🛡 Couverture</div>
@@ -5406,15 +5441,14 @@ function mjTabRegles(){
         <table class="regles-table">
           <tr><th>Type</th><th>Effet</th></tr>
           <tr><td>Attaque d'opportunité</td><td>Réaction quand ennemi quitte portée.</td></tr>
-          <tr><td>Lutte (Agripper)</td><td>FOR vs STR/DEX. Réussit → Entravé.</td></tr>
+          <tr><td>Lutte (Agripper)</td><td>FOR vs FOR/DEX. Réussit → Vitesse 0.</td></tr>
           <tr><td>Bousculer</td><td>FOR vs FOR/DEX. Réussit → Renversé ou recule 1,5m.</td></tr>
           <tr><td>Critique (20)</td><td>Dés de dégâts doublés + modificateurs normaux.</td></tr>
         </table>
       </div>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">⚔ Armes courantes</div>
+    </div>`)}
+    ${ds('s-armes-c',`<div class="regles-section">
+      ${dh('⚔ Armes courantes')}
       <table class="regles-table">
         <tr><th>Arme</th><th>Dégâts</th><th>Propriétés</th></tr>
         <tr><td>Bâton</td><td>1d6 contondant</td><td>Polyvalente (1d8)</td></tr>
@@ -5426,10 +5460,9 @@ function mjTabRegles(){
         <tr><td>Arc court</td><td>1d6 perforant</td><td>Munitions (24/96m), 2 mains</td></tr>
         <tr><td>Arbalète légère</td><td>1d8 perforant</td><td>Munitions (24/96m), chargement, 2 mains</td></tr>
       </table>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">⚔ Armes de guerre</div>
+    </div>`)}
+    ${ds('s-armes-g',`<div class="regles-section">
+      ${dh('⚔ Armes de guerre')}
       <table class="regles-table">
         <tr><th>Arme</th><th>Dégâts</th><th>Propriétés</th></tr>
         <tr><td>Épée longue</td><td>1d8 tranchant</td><td>Polyvalente (1d10)</td></tr>
@@ -5448,13 +5481,10 @@ function mjTabRegles(){
         <tr><td>Arc long</td><td>1d8 perforant</td><td>Munitions (45/180m), lourde, 2 mains</td></tr>
         <tr><td>Arbalète lourde</td><td>1d10 perforant</td><td>Munitions (30/120m), lourde, chargement, 2 mains</td></tr>
       </table>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.7">
-        <strong>Finesse</strong> : FOR ou DEX (même mod pour attaque et dégâts) &nbsp;·&nbsp; <strong>Légère</strong> : combat à 2 armes &nbsp;·&nbsp; <strong>Allonge</strong> : +1,5m portée &nbsp;·&nbsp; <strong>Lourde</strong> : désavantage pour taille P &nbsp;·&nbsp; <strong>Chargement</strong> : 1 tir/action &nbsp;·&nbsp; <strong>Arme improvisée</strong> : 1d4
-      </div>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">🛡 Armures</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.7"><strong>Finesse</strong> : FOR ou DEX &nbsp;·&nbsp; <strong>Légère</strong> : combat à 2 armes &nbsp;·&nbsp; <strong>Allonge</strong> : +1,5m portée &nbsp;·&nbsp; <strong>Lourde</strong> : désavantage taille P &nbsp;·&nbsp; <strong>Chargement</strong> : 1 tir/action &nbsp;·&nbsp; <strong>Improvisée</strong> : 1d4</div>
+    </div>`)}
+    ${ds('s-armures',`<div class="regles-section">
+      ${dh('🛡 Armures')}
       <table class="regles-table">
         <tr><th>Armure</th><th>CA</th><th>Discrétion</th></tr>
         <tr><td colspan="3" style="color:var(--cp);font-size:11px;font-weight:600">Légères</td></tr>
@@ -5474,13 +5504,13 @@ function mjTabRegles(){
         <tr><td>Harnois</td><td>18 (FOR 15 ou −3m)</td><td>Désavantage</td></tr>
         <tr><td>Bouclier</td><td>+2</td><td>—</td></tr>
       </table>
-    </div>
-
+    </div>`)}
+    ${ds('s-modifs',`<div style="display:flex;align-items:center;gap:6px;padding:4px 0 8px;color:var(--text3);font-size:11px"><span class="mj-drag-handle" title="Glisser pour réorganiser">⠿</span>Modificateurs &amp; Fatigue / Faim</div>
     <div class="g2" style="gap:10px">
       <div class="regles-section">
         <div class="pt">🎒 Modificateurs de caractéristiques</div>
         <table class="regles-table">
-          <tr><th>Score</th><th>Modificateur</th></tr>
+          <tr><th>Score</th><th>Mod.</th></tr>
           <tr><td>1</td><td style="color:#e53935">−5</td></tr>
           <tr><td>2–3</td><td style="color:#e53935">−4</td></tr>
           <tr><td>4–5</td><td style="color:#e53935">−3</td></tr>
@@ -5494,12 +5524,12 @@ function mjTabRegles(){
           <tr><td>20–21</td><td style="color:var(--cp)">+5</td></tr>
           <tr><td>22–23</td><td style="color:var(--cp)">+6</td></tr>
           <tr><td>24–25</td><td style="color:var(--cp)">+7</td></tr>
-          <tr><td>28–29</td><td style="color:var(--cp)">+9</td></tr>
-          <tr><td>30</td><td style="color:var(--cp)">+10</td></tr>
+          <tr><td>28–30</td><td style="color:var(--cp)">+9/+10</td></tr>
         </table>
       </div>
       <div class="regles-section">
-        <div class="pt">😵 Épuisement</div>
+        <div class="pt">😵 Épuisement & 🍖 Faim/Soif</div>
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Niveaux d'épuisement</div>
         <table class="regles-table">
           <tr><th>Niv.</th><th>Effet</th></tr>
           <tr><td>1</td><td>Désavantage aux jets de caractéristique</td></tr>
@@ -5509,33 +5539,44 @@ function mjTabRegles(){
           <tr><td>5</td><td>Vitesse réduite à 0</td></tr>
           <tr><td style="color:#e53935;font-weight:600">6</td><td style="color:#e53935">Mort</td></tr>
         </table>
-        <div style="font-size:11px;color:var(--text3);margin-top:6px">Repos long : réduit de 1 niveau. Chaque repos long supplémentaire réduit encore d'1 niveau.</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:5px;margin-bottom:10px">Repos long : −1 niveau d'épuisement.</div>
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Faim</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:8px">
+          Besoin : <strong>500 g/jour</strong>. Moins de la moitié → JS CON DD 10 ou +1 épuisement.<br>
+          Sans nourriture : après <strong>3 + mod CON jours</strong> (min 1), +1 épuisement automatique/jour.
+        </div>
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Soif</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.7">
+          Besoin : <strong>3,5 l/jour</strong> (7 l en chaleur extrême).<br>
+          Sans eau 1 jour → JS CON DD 15 ou +1 épuisement (+2 si raté de 5+).<br>
+          Armure intermédiaire/lourde → désavantage au jet.
+        </div>
       </div>
-    </div>
-
+    </div>`)}
+    ${ds('s-voyage',`<div style="display:flex;align-items:center;gap:6px;padding:4px 0 8px;color:var(--text3);font-size:11px"><span class="mj-drag-handle" title="Glisser pour réorganiser">⠿</span>Voyage &amp; Lumière</div>
     <div class="g2" style="gap:10px">
       <div class="regles-section">
         <div class="pt">🚶 Allures de voyage</div>
         <table class="regles-table">
           <tr><th>Allure</th><th>Minute</th><th>Heure</th><th>Jour</th><th>Effet</th></tr>
-          <tr><td>Rapide</td><td>120 m</td><td>6 km</td><td>45 km</td><td style="color:#e53935">−5 Percep. passive</td></tr>
+          <tr><td>Rapide</td><td>120 m</td><td>6 km</td><td>45 km</td><td style="color:#e53935">−5 Percep.</td></tr>
           <tr><td>Normale</td><td>90 m</td><td>4,5 km</td><td>36 km</td><td>—</td></tr>
-          <tr><td>Lente</td><td>60 m</td><td>3 km</td><td>27 km</td><td style="color:var(--cp)">Discrétion possible</td></tr>
+          <tr><td>Lente</td><td>60 m</td><td>3 km</td><td>27 km</td><td style="color:var(--cp)">Discrétion</td></tr>
         </table>
       </div>
       <div class="regles-section">
         <div class="pt">🕯 Sources de lumière</div>
         <table class="regles-table">
-          <tr><th>Source</th><th>Lumière vive</th><th>Faible</th><th>Durée</th></tr>
+          <tr><th>Source</th><th>Vive</th><th>Faible</th><th>Durée</th></tr>
           <tr><td>Bougie</td><td>1,5 m</td><td>+1,5 m</td><td>1 h</td></tr>
           <tr><td>Lampe</td><td>4,5 m</td><td>+9 m</td><td>6 h</td></tr>
           <tr><td>Lanterne à capote</td><td>9 m</td><td>+9 m</td><td>6 h</td></tr>
-          <tr><td>Lanterne sourde</td><td>18 m (cône)</td><td>+18 m</td><td>6 h</td></tr>
+          <tr><td>Lanterne sourde</td><td>18 m</td><td>+18 m</td><td>6 h</td></tr>
           <tr><td>Torche</td><td>6 m</td><td>+6 m</td><td>1 h</td></tr>
         </table>
       </div>
-    </div>
-
+    </div>`)}
+    ${ds('s-vie',`<div style="display:flex;align-items:center;gap:6px;padding:4px 0 8px;color:var(--text3);font-size:11px"><span class="mj-drag-handle" title="Glisser pour réorganiser">⠿</span>Train de vie &amp; Monnaies</div>
     <div class="g2" style="gap:10px">
       <div class="regles-section">
         <div class="pt">🏨 Train de vie</div>
@@ -5553,53 +5594,47 @@ function mjTabRegles(){
         <div class="pt">💰 Monnaies & Conversions</div>
         <table class="regles-table">
           <tr><th>Unité</th><th>Équivalent</th></tr>
-          <tr><td>1 pc (pièce de cuivre)</td><td>—</td></tr>
-          <tr><td>1 pa (pièce d'argent)</td><td>= 10 pc</td></tr>
-          <tr><td>1 pe (pièce d'électrum)</td><td>= 5 pa = 50 pc</td></tr>
-          <tr><td>1 po (pièce d'or)</td><td>= 10 pa = 100 pc</td></tr>
-          <tr><td>1 pp (pièce de platine)</td><td>= 10 po = 1000 pc</td></tr>
+          <tr><td>1 pc</td><td>—</td></tr>
+          <tr><td>1 pa</td><td>= 10 pc</td></tr>
+          <tr><td>1 pe</td><td>= 50 pc</td></tr>
+          <tr><td>1 po</td><td>= 100 pc</td></tr>
+          <tr><td>1 pp</td><td>= 1000 pc</td></tr>
         </table>
         <div style="font-size:11px;color:var(--text3);margin-top:6px">5 ft = 1,5 m &nbsp;·&nbsp; 1 mile = 1,5 km &nbsp;·&nbsp; 1 lb = 500 g</div>
       </div>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">💤 Repos</div>
+    </div>`)}
+    ${ds('s-repos',`<div class="regles-section">
+      ${dh('💤 Repos')}
       <table class="regles-table">
         <tr><th></th><th>Repos court (≥ 1h)</th><th>Repos long (≥ 8h)</th></tr>
         <tr><td><strong>PV récupérés</strong></td><td>Dés de vie dépensés + mod CON</td><td>Tous les PV max</td></tr>
         <tr><td><strong>Dés de vie</strong></td><td>Utilisables librement</td><td>Récupère niv/2 (min 1)</td></tr>
-        <tr><td><strong>Capacités</strong></td><td>Repos court : ki, Magie de pacte, Deuxième Souffle...</td><td>Repos long : Magie, Rage, quasi-tout</td></tr>
+        <tr><td><strong>Capacités</strong></td><td>Ki, Magie de pacte, Deuxième Souffle...</td><td>Magie, Rage, quasi-tout</td></tr>
       </table>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">💀 Jet de sauvegarde contre la mort</div>
+    </div>`)}
+    ${ds('s-mort',`<div class="regles-section">
+      ${dh('💀 Jet de sauvegarde contre la mort')}
       <div style="font-size:13px;color:var(--text2);line-height:1.8">
         À 0 PV : jets de sauvegarde à chaque tour (1d20, sans modificateur).<br>
         • <strong style="color:#4caf50">10+</strong> → Succès (3 succès = stable, inconscient mais vivant).<br>
         • <strong style="color:#e53935">1-9</strong> → Échec (3 échecs = mort).<br>
-        • <strong style="color:'#ffd54f'">1 naturel</strong> → 2 échecs d'un coup.<br>
-        • <strong style="color:'#ffd54f'">20 naturel</strong> → Retour à 1 PV, debout.<br>
+        • <strong style="color:#ffd54f">1 naturel</strong> → 2 échecs d'un coup.<br>
+        • <strong style="color:#ffd54f">20 naturel</strong> → Retour à 1 PV, debout.<br>
         • Subir des dégâts à 0 PV → 1 échec (ou 2 si corps à corps).
       </div>
-    </div>
-
-    <div class="regles-section">
-      <div class="pt">📚 Compendium D&D 5e</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Référence rapide — descriptions en anglais (source officielle)</div>
+    </div>`)}
+    ${ds('s-compendium',`<div class="regles-section">
+      ${dh('📚 Compendium D&D 5e')}
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Référence rapide — descriptions en français</div>
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
         <button class="btn bsm${_mjReglesComp==='classes'?' bprimary':''}" onclick="mjSetReglesComp('classes')">⚔ Classes${CLASSES_DB?' ('+CLASSES_DB.length+')':''}</button>
         <button class="btn bsm${_mjReglesComp==='dons'?' bprimary':''}" onclick="mjSetReglesComp('dons')">🎯 Dons${FEATS_DB?' ('+FEATS_DB.length+')':''}</button>
         <button class="btn bsm${_mjReglesComp==='races'?' bprimary':''}" onclick="mjSetReglesComp('races')">🧬 Races${RACES_DB?' ('+RACES_DB.length+')':''}</button>
         <button class="btn bsm${_mjReglesComp==='historiques'?' bprimary':''}" onclick="mjSetReglesComp('historiques')">📖 Historiques${BACKGROUNDS_DB?' ('+BACKGROUNDS_DB.length+')':''}</button>
-        ${_mjReglesComp?`<button class="btn bsm" style="color:#e53935;border-color:#e53935" onclick="mjSetReglesComp('')">✕ Fermer</button>`:''}
+        ${_mjReglesComp?'<button class="btn bsm" style="color:#e53935;border-color:#e53935" onclick="mjSetReglesComp(\'\')">✕ Fermer</button>':''}
       </div>
-      ${_mjReglesComp?`
-        <input class="fi" id="compSearch" placeholder="Rechercher..." oninput="mjFilterComp(this.value)" style="margin-bottom:8px" autofocus>
-        <div id="compResults" style="max-height:300px;overflow-y:auto"></div>
-      `:`<div style="font-size:12px;color:var(--text3);font-style:italic">Cliquez sur une catégorie pour rechercher.</div>`}
-    </div>
+      ${_mjReglesComp?'<input class="fi" id="compSearch" placeholder="Rechercher..." oninput="mjFilterComp(this.value)" style="margin-bottom:8px" autofocus><div id="compResults" style="max-height:300px;overflow-y:auto"></div>':'<div style="font-size:12px;color:var(--text3);font-style:italic">Cliquez sur une catégorie pour rechercher.</div>'}
+    </div>`)}
   </div>`;
 }
 
