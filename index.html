@@ -297,20 +297,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 
     <!-- INSCRIPTION -->
     <div id="formRegister" style="display:none">
-      <div class="fl mb6" style="margin-top:0">Choisissez votre rôle</div>
-      <div class="auth-role" style="margin-bottom:16px">
-        <div class="auth-role-btn on" id="roleMJ" onclick="selectRole('MJ')">
-          <span class="role-icon">🎲</span>
-          <div class="role-name">Maître de Jeu</div>
-          <div class="role-desc">Crée et gère les tables & campagnes</div>
-        </div>
-        <div class="auth-role-btn" id="roleJoueur" onclick="selectRole('Joueur')">
-          <span class="role-icon">⚔</span>
-          <div class="role-name">Joueur</div>
-          <div class="role-desc">Rejoint une table et gère ses personnages</div>
-        </div>
-      </div>
-      <div class="fl mb6">Choisissez votre icône</div>
+      <div class="fl mb6" style="margin-top:0">Choisissez votre icône</div>
       <div class="avatar-pick" id="avatarPick">
         <span class="avatar-opt on" onclick="selectAvatar('⚔')">⚔</span>
         <span class="avatar-opt" onclick="selectAvatar('🧙')">🧙</span>
@@ -397,7 +384,6 @@ const fbDb=firebase.firestore();
 
 let currentUser=null;
 let currentUserData=null;
-let selectedRole='MJ';
 let selectedAvatar='⚔';
 let currentTableId=null;
 let currentCampaignId=null;
@@ -446,8 +432,6 @@ function showHub(){
   _expandedCamp=null;
   const btn=document.getElementById('hubUserBtn');
   if(btn&&currentUserData) btn.innerHTML=`${currentUserData.avatar||'⚔'} ${esc(currentUserData.displayName)}`;
-  const mjBadge=document.getElementById('hubMJBadge');
-  if(mjBadge) mjBadge.style.display=(currentUserData&&currentUserData.role==='MJ')?'flex':'none';
   renderHub();
 }
 function showApp(){
@@ -455,11 +439,11 @@ function showApp(){
   document.getElementById('hubScreen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('mjScreen').style.display='none';
-  mjMode=currentUserData&&currentUserData.role==='MJ';
+  mjMode=false;
   const mjBtn=document.getElementById('mjBtn');
-  if(mjBtn) mjBtn.style.display=mjMode?'':'none';
+  if(mjBtn) mjBtn.style.display='none';
   const hdrUser=document.getElementById('hdrUser');
-  if(hdrUser&&currentUserData) hdrUser.textContent=`${currentUserData.role==='MJ'?'🎲':'⚔'} ${currentUserData.displayName}`;
+  if(hdrUser&&currentUserData) hdrUser.textContent=`⚔ ${currentUserData.displayName}`;
 }
 
 // ─── AUTH UI ───
@@ -469,11 +453,6 @@ function switchAuthTab(tab){
   document.getElementById('authTabLogin').className=tab==='login'?'on':'';
   document.getElementById('authTabRegister').className=tab==='register'?'on':'';
   document.getElementById('authError').style.display='none';
-}
-function selectRole(role){
-  selectedRole=role;
-  document.getElementById('roleMJ').className='auth-role-btn'+(role==='MJ'?' on':'');
-  document.getElementById('roleJoueur').className='auth-role-btn'+(role==='Joueur'?' on':'');
 }
 function selectAvatar(av){
   selectedAvatar=av;
@@ -498,7 +477,7 @@ async function doRegister(){
   if(pw.length<6){showAuthError('Mot de passe : 6 caractères minimum.');return;}
   try{
     const cred=await fbAuth.createUserWithEmailAndPassword(email,pw);
-    await fbDb.collection('users').doc(cred.user.uid).set({displayName:name,avatar:selectedAvatar,email,role:selectedRole,charLib:{},createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await fbDb.collection('users').doc(cred.user.uid).set({displayName:name,avatar:selectedAvatar,email,charLib:{},createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     await cred.user.updateProfile({displayName:name});
   }catch(e){const m={'auth/email-already-in-use':'Email déjà utilisé.','auth/invalid-email':'Email invalide.','auth/weak-password':'Mot de passe trop faible.'};showAuthError(m[e.code]||'Erreur : '+e.message);}
 }
@@ -707,8 +686,7 @@ async function toggleCampExpand(tableId,campId){
         }
       }
     }
-    const isMJ=currentUserData&&currentUserData.role==='MJ';
-    document.getElementById('hubContent').innerHTML=renderHubHTML(_hubCache,isMJ);
+    document.getElementById('hubContent').innerHTML=renderHubHTML(_hubCache);
   }else{await renderHub();}
 }
 
@@ -716,16 +694,10 @@ async function renderHub(){
   const hub=document.getElementById('hubContent');
   if(!hub)return;
   hub.innerHTML='<div class="hub-empty"><span class="auth-spinner"></span> Chargement...</div>';
-  const isMJ=currentUserData&&currentUserData.role==='MJ';
   try{
     let tables=[];
-    if(isMJ){
-      const snap=await fbDb.collection('tables').where('mjId','==',currentUser.uid).get();
-      tables=snap.docs.map(d=>({id:d.id,...d.data()}));
-    }else{
-      const snap=await fbDb.collection('tables').where('memberIds','array-contains',currentUser.uid).get();
-      tables=snap.docs.map(d=>({id:d.id,...d.data()}));
-    }
+    const snap=await fbDb.collection('tables').where('memberIds','array-contains',currentUser.uid).get();
+    tables=snap.docs.map(d=>({id:d.id,...d.data()}));
     const tablesWithCamps=await Promise.all(tables.map(async t=>{
       const cs=await fbDb.collection('campaigns').where('tableId','==',t.id).orderBy('createdAt','desc').get();
       return{...t,campaigns:cs.docs.map(d=>({id:d.id,...d.data()}))};
@@ -748,15 +720,18 @@ async function renderHub(){
       }
     }
     _hubCache=tablesWithCamps;
-    hub.innerHTML=renderHubHTML(tablesWithCamps,isMJ);
+    const mjBadge=document.getElementById('hubMJBadge');
+    if(mjBadge) mjBadge.style.display=tablesWithCamps.some(t=>t.mjId===currentUser.uid)?'flex':'none';
+    hub.innerHTML=renderHubHTML(tablesWithCamps);
     const params=new URLSearchParams(window.location.search);
     const joinCode=params.get('join');
     if(joinCode) setTimeout(()=>promptJoinTable(joinCode),300);
   }catch(e){hub.innerHTML=`<div style="color:#e53935;padding:16px">Erreur: ${e.message}</div>`;}
 }
 
-function renderHubHTML(tables,isMJ){
+function renderHubHTML(tables){
   const tableCards=tables.length?tables.map(t=>{
+    const isMJ=t.mjId===currentUser.uid;
     const memberNames=t.memberNames||{};
     const memberAvatars=t.memberAvatars||{};
     const memberBadges=(t.memberIds||[]).filter(uid=>uid!==t.mjId).map(uid=>`<span class="member-badge">${memberAvatars[uid]||'⚔'} ${esc(memberNames[uid]||'Joueur')}</span>`).join('');
@@ -825,12 +800,15 @@ function renderHubHTML(tables,isMJ){
       ${isMJ?`<div class="invite-box" style="margin-top:10px">🔗 Invitation : <button class="btn bsm" onclick="copyInviteLink('${t.inviteCode}')" style="margin-left:4px">Copier le lien</button></div>`:''}
     </div>`;
   }).join(''):
-    `<div class="hub-empty">${isMJ?'Aucune table. Créez votre première table !':'Vous n\'êtes dans aucune table. Rejoignez-en une avec un lien d\'invitation.'}</div>`;
+    `<div class="hub-empty">Aucune table. Créez une table ou rejoignez-en une !</div>`;
   return`
     <div class="hub-section">
       <div class="hub-section-title">
-        <span>${isMJ?'🎲 Mes Tables':'⚔ Mes Tables'}</span>
-        ${isMJ?`<button class="btn bsm bprimary" onclick="openCreateTable()">+ Nouvelle table</button>`:`<button class="btn bsm bprimary" onclick="openJoinTable()">+ Rejoindre une table</button>`}
+        <span>⚔ Mes Tables</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn bsm bprimary" onclick="openCreateTable()">+ Nouvelle table</button>
+          <button class="btn bsm" onclick="openJoinTable()">+ Rejoindre</button>
+        </div>
       </div>
       ${tableCards}
     </div>`;
@@ -981,8 +959,7 @@ async function saveEditCampaign(tableId,campId){
     const t=_hubCache&&_hubCache.find(t=>t.id===tableId);
     if(t){const c=t.campaigns.find(c=>c.id===campId);if(c){c.description=desc;c.detailedDesc=detailed;c.imageUrl=img;c.status=status;}}
     closeModal();showToast('✅ Campagne mise à jour !');
-    const isMJ=currentUserData&&currentUserData.role==='MJ';
-    document.getElementById('hubContent').innerHTML=renderHubHTML(_hubCache,isMJ);
+    document.getElementById('hubContent').innerHTML=renderHubHTML(_hubCache);
   }catch(e){showToast('❌ Erreur : '+e.message);}
 }
 
@@ -1012,7 +989,6 @@ async function confirmJoinTable(){
 }
 async function doJoinTable(code){
   try{
-    if(currentUserData&&currentUserData.role==='MJ'){showToast('❌ Les Maîtres de Jeu ne peuvent pas rejoindre la table d\'un autre MJ.');closeModal();return;}
     const snap=await fbDb.collection('tables').where('inviteCode','==',code).limit(1).get();
     if(snap.empty){showToast('❌ Code invalide.');return;}
     const tableDoc=snap.docs[0];
@@ -1087,7 +1063,7 @@ function viewCharSheet(uid,campId){
   if(!pp){showToast('❌ Personnage introuvable.');return;}
   const p=pp.fullData||{};
   const priv=pp.priv||{};
-  const isMJ2=currentUserData&&currentUserData.role==='MJ';
+  const isMJ2=!!(currentTableId&&_hubCache&&(_hubCache.find(t=>t.id===currentTableId)||{}).mjId===currentUser.uid);
   const isOwn=uid===currentUser.uid;
   const canSee=tab=>(isMJ2||isOwn||priv[tab]!==false);
   const cls=(p.classes||[]).map(c=>c.name+' niv.'+c.level).join(' / ')||'?';
@@ -1126,7 +1102,8 @@ async function enterCampaign(tableId,campaignId,tName,cName,preloadedCharData){
   if(!tName&&_hubCache){const t=_hubCache.find(t=>t.id===tableId);if(t){tName=t.name;const c=t.campaigns.find(c=>c.id===campaignId);if(c)cName=c.name;}}
   currentTableName=tName||'';
   currentCampaignName=cName||'';
-  const asMJ=currentUserData&&currentUserData.role==='MJ';
+  const tableData=_hubCache&&_hubCache.find(t=>t.id===tableId);
+  const asMJ=!!(tableData&&tableData.mjId===currentUser.uid);
   try{
     if(asMJ){
       // MJ : pas de personnage jouable, on charge le journal + données MJ
