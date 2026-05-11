@@ -271,6 +271,52 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .mj-log{max-height:160px;overflow-y:auto;padding:8px;background:rgba(0,0,0,.3);border-radius:6px;font-size:11px;color:var(--text3)}
 .mj-log-entry{padding:2px 0;border-bottom:1px solid rgba(46,50,64,.3);line-height:1.5}
 .bprimary{background:rgba(200,168,75,.15)!important;border-color:var(--cp)!important;color:var(--cp)!important}
+/* ===== RESPONSIVE MOBILE ===== */
+@media(max-width:640px){
+  /* Espacement global */
+  #app,#mjScreen{padding:6px}
+  .hub-body{padding:10px}
+  .panel{padding:10px 8px}
+  .hdr{padding:8px 10px}
+  /* Grilles nommées */
+  .g2,.g3{grid-template-columns:1fr}
+  .g6{grid-template-columns:repeat(3,1fr)}
+  .eq-layout{grid-template-columns:1fr}
+  /* Grilles inline — sélecteurs d'attribut */
+  [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  [style*="grid-template-columns:repeat(3"]{grid-template-columns:1fr!important}
+  [style*="grid-template-columns:repeat(4"]{grid-template-columns:repeat(2,1fr)!important}
+  [style*="grid-template-columns:repeat(5"]{grid-template-columns:repeat(3,1fr)!important}
+  [style*="grid-template-columns:repeat(6"]{grid-template-columns:repeat(3,1fr)!important}
+  [style*="grid-template-columns:280px"]{grid-template-columns:1fr!important}
+  /* Barres d'onglets — scroll horizontal au lieu de wrap */
+  .tabs,.mj-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none}
+  .tabs::-webkit-scrollbar,.mj-tabs::-webkit-scrollbar{display:none}
+  .tab,.mj-tab{white-space:nowrap;flex-shrink:0}
+  /* Barre joueurs */
+  .pbar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .pbar::-webkit-scrollbar{display:none}
+  /* Modale */
+  .modal-box{width:96%;padding:14px;max-height:92vh}
+  /* Portrait équipement centré en mobile */
+  .eq-portrait{max-width:140px;margin:0 auto}
+  /* Inventaire — wrap sur items larges */
+  .inv-item{flex-wrap:wrap}
+  /* Tables de règles */
+  .regles-table{font-size:11px}
+  .regles-table th,.regles-table td{padding:4px 5px}
+  /* Combat row — wrap */
+  .combat-row{flex-wrap:wrap}
+  /* Boutons plus compacts */
+  .btn{padding:5px 10px;font-size:12px}
+  .bsm{padding:3px 7px;font-size:11px}
+}
+/* Breakpoint très petit (iPhone SE, etc.) */
+@media(max-width:380px){
+  .tab,.mj-tab{font-size:11px;padding:5px 9px}
+  .hdr-title{font-size:14px}
+  .g6{grid-template-columns:repeat(2,1fr)}
+}
 </style>
 </head>
 <body>
