@@ -1874,6 +1874,14 @@ function upd(k,v){P()[k]=v;}
 function autoGrow(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight+2,500)+'px';}
 function autoGrowAll(){document.querySelectorAll('textarea.fi').forEach(autoGrow);}
 
+let _combatSectionOrder=[];
+let _combatDragId=null;
+function combatDragStart(id,el){_combatDragId=id;setTimeout(()=>el.classList.add('mj-dragging'),0);}
+function combatDragEnd(el){el.classList.remove('mj-dragging');document.querySelectorAll('.mj-drop-before,.mj-drop-after').forEach(x=>x.classList.remove('mj-drop-before','mj-drop-after'));}
+function combatDragOver(e,el){e.preventDefault();if(!_combatDragId||el.dataset.csid===_combatDragId)return;document.querySelectorAll('.mj-drop-before,.mj-drop-after').forEach(x=>x.classList.remove('mj-drop-before','mj-drop-after'));const r=el.getBoundingClientRect();el.classList.add(e.clientY<r.top+r.height/2?'mj-drop-before':'mj-drop-after');}
+function combatDrop(e,targetId){e.preventDefault();if(!_combatDragId||_combatDragId===targetId)return;const c=document.getElementById('combatContainer');const dragged=c.querySelector('[data-csid="'+_combatDragId+'"]');const target=c.querySelector('[data-csid="'+targetId+'"]');if(!dragged||!target)return;document.querySelectorAll('.mj-drop-before,.mj-drop-after').forEach(x=>x.classList.remove('mj-drop-before','mj-drop-after'));if(target.classList.contains('mj-drop-before'))c.insertBefore(dragged,target);else c.insertBefore(dragged,target.nextSibling);_combatDragId=null;_combatSectionOrder=[...c.querySelectorAll('[data-csid]')].map(x=>x.dataset.csid);}
+function applyCombatOrder(order){if(!order||!order.length)return;const c=document.getElementById('combatContainer');if(!c)return;const map={};c.querySelectorAll(':scope>[data-csid]').forEach(e=>map[e.dataset.csid]=e);order.forEach(id=>{if(map[id])c.appendChild(map[id]);});}
+function cs(id,html){return`<div class="mj-rules-section" data-csid="${id}" draggable="true" ondragstart="combatDragStart('${id}',this)" ondragend="combatDragEnd(this)" ondragover="combatDragOver(event,this)" ondrop="combatDrop(event,'${id}')">${html}</div>`;}
 let _spellLevelsOpen={};
 let _equipProfOpen={w:true,a:true};
 
@@ -1942,6 +1950,7 @@ function renderTab(){
   const map={perso:tabPerso,competences:tabCompetences,combat:tabCombat,equipement:tabEquipement,sac:tabSac,historique:tabHistorique,xp:tabXP,sorts:tabSorts,levelup:tabLevelUp,journal:tabJournal};
   el.innerHTML=(map[state.activeTab]||tabPerso)(p);
   setTimeout(autoGrowAll,0);
+  setTimeout(()=>applyCombatOrder(_combatSectionOrder),10);
 }
 
 function switchPlayer(i){state.activeIdx=i;resetCS();render();}
@@ -2643,15 +2652,28 @@ function tabCompetences(p){
   </div></div>`;
 }
 
+function maxExpertise(p){
+  let max=0;
+  (p.classes||[]).forEach(c=>{
+    if(c.name==='Roublard')max+=c.level>=6?4:2;
+    if(c.name==='Barde')max+=c.level>=10?4:c.level>=3?2:0;
+  });
+  return max;
+}
 function cycleSkillIfAllowed(name,current,maxSkills){
   const p=P();if(!p.skillProf)p.skillProf={};
   const total=Object.values(p.skillProf).filter(v=>v>0).length;
-  // En mode MJ : liberté totale. En mode joueur : bloquer si max atteint
   if(!isMJ()&&current===0&&total>=maxSkills){
     showToast('❌ Maximum de compétences atteint.');return;
   }
-  // Permettre la progression : 0→1 (maîtrise), 1→2 (expertise), 2→0 (retirer)
-  p.skillProf[name]=((p.skillProf[name]||0)+1)%3;
+  const nextVal=((p.skillProf[name]||0)+1)%3;
+  if(!isMJ()&&nextVal===2){
+    const maxExp=maxExpertise(p);
+    if(maxExp===0){showToast('❌ Ta classe ne permet pas l\'expertise (Roublard ou Barde requis).');return;}
+    const curExp=Object.values(p.skillProf).filter(v=>v===2).length;
+    if(curExp>=maxExp){showToast(`❌ Limite d'expertise atteinte (${maxExp} max pour ta classe).`);return;}
+  }
+  p.skillProf[name]=nextVal;
   render();
 }
 function openFeatSearch(){openModal(`<div class="pt">Ajouter une capacité</div><input class="fi" id="featQ" placeholder="Chercher..." oninput="filterFeats(this.value)" style="margin-bottom:8px"><div id="featList">${renderFeatList('')}</div><div style="margin-top:10px;display:flex;gap:8px"><input class="fi" id="featCustomName" placeholder="Nom"><input class="fi" id="featCustomDesc" placeholder="Description"><button class="btn bsm bac" onclick="addCustomFeat()">+</button></div><button class="btn bsm bdanger" style="margin-top:8px;width:100%" onclick="closeModal()">Fermer</button>`);}
@@ -2681,7 +2703,7 @@ function tabCombat(p){
   const slots=calcSpellSlots(p);const slotsUsed=p.spellSlotsUsed||[];
   const warlockSlots=getWarlockSlots(p);
   const hasCaster=(p.classes||[]).some(c=>{const d=SRD.classes.find(cl=>cl.name===c.name);return d&&d.spellcaster;});
-  const weapons=['mainhand','offhand'].map(slot=>{const i=(p.equip||{})[slot];return i&&i.name?{...i,slot}:null;}).filter(Boolean);
+  const weapons=['mainhand','offhand','ranged'].map(slot=>{const i=(p.equip||{})[slot];return i&&i.name?{...i,slot}:null;}).filter(Boolean);
 
   // Bonus de rage Barbare selon niveau
   const barbareLvl=((p.classes||[]).find(c=>c.name==='Barbare')||{}).level||0;
@@ -2700,38 +2722,37 @@ function tabCombat(p){
   const allCombatFeats=[];
   (p.classes||[]).forEach(cls=>{const d=SRD.classes.find(c=>c.name===cls.name);if(d&&d.combatFeatures)d.combatFeatures.forEach(f=>allCombatFeats.push({...f,className:cls.name}));});
 
-  return`<div class="g2" style="gap:10px">
-  <div>
-    <!-- Armes -->
-    <div class="panel mb10"><div class="pt">Armes équipées</div>
+  return`<div id="combatContainer">
+  ${cs('cs-armes',`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span>Armes équipées</div>
       ${weapons.length?weapons.map(w=>{
         const srdW=SRD.weapons.find(sw=>sw.name===w.name);
         const finesse=srdW&&(srdW.properties||'').includes('Finesse');
         const atkM=finesse?Math.max(forM,dexM):forM;
         const atkBonus=pb(lvl)+atkM;
         const isMagic=w.magic;
+        const slotLabel=w.slot==='mainhand'?'Main droite':w.slot==='offhand'?'Main gauche':'Distance';
+        const ammoItem=w.slot==='ranged'&&w.ammoLink?(p.inventory||[]).find(i=>i.name===w.ammoLink):null;
+        const ammoCount=ammoItem?ammoItem.qty:null;
         return`<div style="background:var(--surface2);border:1px solid ${isMagic?'#9b59b6':'var(--border)'};border-radius:6px;padding:10px;margin-bottom:6px">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:14px;font-weight:600">${esc(w.name)}${isMagic?` <span class="magic-badge">✨ Magique${w.linkedTo?' • Lié: '+esc(w.linkedTo):''}</span>`:''}</span>
             <span style="color:var(--cp);font-weight:600">+${atkBonus} / ${esc(srdW?srdW.damage:'—')}</span>
           </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:3px">${w.slot==='mainhand'?'Main droite':'Main gauche'}</div>
-          <button class="btn bsm" style="margin-top:6px" onclick="rollAttack('${esc(w.name)}',${atkBonus},'${esc(srdW?srdW.damage:'1d6')}')">🎲 Attaque</button>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">${slotLabel}${w.slot==='ranged'&&ammoCount!==null?` • 🏹 <span style="color:${ammoCount<=5?'#e53935':'var(--cp)'}">${ammoCount}</span> ${esc(w.ammoLink||'munitions')}`:''}</div>
+          ${w.slot==='ranged'?`<div style="font-size:11px;color:var(--text3);margin-top:4px">
+            ${w.ammoLink?`<button class="btn bsm" style="font-size:10px" onclick="unlinkRangedAmmo()">↩ Délier ${esc(w.ammoLink)}</button>`:
+            `<button class="btn bsm" style="font-size:10px" onclick="openLinkAmmoModal()">🏹 Lier des munitions</button>`}
+          </div>`:''}
+          <button class="btn bsm" style="margin-top:6px" onclick="rollAttack('${esc(w.name)}',${atkBonus},'${esc(srdW?srdW.damage:'1d6')}','${w.slot}')">🎲 Attaque</button>
         </div>`;
       }).join(''):`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucune arme équipée.</div>`}
       <div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap">${['d4','d6','d8','d10','d12','d20'].map(d=>`<button class="dice-btn" onclick="rollDie('${d}')">🎲 ${d}</button>`).join('')}</div>
       <div id="rollResult" style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:6px;display:none;font-size:14px;font-weight:600;color:var(--cp);text-align:center"></div>
-    </div>
-
-    <!-- Sauvegardes -->
-    <div class="panel"><div class="pt">Sauvegardes</div>
+    </div>`)}
+  ${cs('cs-sauvegardes',`<div class="panel"><div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span>Sauvegardes</div>
       ${ABILITIES_SH.map((ab,i)=>{const saves=CLASS_SAVES[mc?mc.name:'']||[];const hasSave=saves.includes(i);const m=mod(p.abilities[i])+(hasSave?pb(lvl):0);return`<div class="save-btn" onclick="rollSave('${ab}',${m})"><span class="save-dot${hasSave?' p':''}"></span><span style="flex:1;font-size:13px">${ab}</span><span style="color:var(--cp);font-weight:600">${fmt(m)}</span><span style="font-size:10px;color:var(--text3)">🎲</span></div>`;}).join('')}
-    </div>
-  </div>
-
-  <div>
-    <!-- Capacités de combat -->
-    ${allCombatFeats.length||isMJ()?`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;justify-content:space-between"><span>Capacités de combat</span>${isMJ()?`<button class="btn bsm" onclick="openFeatSearch()">+ Ajouter</button>`:''}</div>
+    </div>`)}
+  ${allCombatFeats.length||isMJ()?cs('cs-capacites',`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span><span>Capacités de combat</span></div>${isMJ()?`<button class="btn bsm" onclick="openFeatSearch()">+ Ajouter</button>`:''}</div>
       ${allCombatFeats.map(f=>{
         const fid='cf_'+f.name.replace(/\s+/g,'_');
         const maxCharges=getChargesMax(f,p);
@@ -2754,10 +2775,8 @@ function tabCombat(p){
         </div>`;
       }).join('')}
       ${!allCombatFeats.length&&isMJ()?`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucune capacité de classe. Le MJ peut en ajouter via le bouton ci-dessus.</div>`:''}
-    </div>`:''}
-
-    <!-- Mécaniques spéciales de classe -->
-    ${barbareLvl>0?`<div class="panel mb10"><div class="pt">Rage — Barbare</div>
+    </div>`):''}
+  ${barbareLvl>0?cs('cs-barbare',`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span>Rage — Barbare</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div class="sb hi" style="flex:1;min-width:80px"><div class="sn">Bonus dégâts</div><div style="font-size:20px;font-weight:700;color:var(--cp)">+${rageBonus}</div></div>
         <div style="flex:2">
@@ -2765,9 +2784,8 @@ function tabCombat(p){
           ${(()=>{const rageMax=barbareLvl>=17?6:barbareLvl>=12?5:barbareLvl>=6?4:barbareLvl>=3?3:2;const rageUsed=(p.combatCharges||{})['Rage (2 utilisations, +2 dégâts)']||rageMax;const remaining=rageUsed;return`<div style="display:flex;gap:4px;flex-wrap:wrap">${Array.from({length:rageMax},(_,i)=>`<span class="slot-bubble${i<remaining?'':' used'}" onclick="useCombatCharge('Rage (2 utilisations, +2 dégâts)',${rageMax})" title="Utiliser une rage"></span>`).join('')}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">${remaining}/${rageMax} • Récup. repos long</div><button class="btn bsm" style="margin-top:4px" onclick="recoverCombatCharge('Rage (2 utilisations, +2 dégâts)',${rageMax})">↺ Récupérer</button>`;})()}
         </div>
       </div>
-    </div>`:''}
-
-    ${moineLvl>0?`<div class="panel mb10"><div class="pt">Points Ki — Moine</div>
+    </div>`):''}
+  ${moineLvl>0?cs('cs-moine',`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span>Points Ki — Moine</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div class="sb hi" style="flex:1;min-width:80px"><div class="sn">Ki max</div><div style="font-size:20px;font-weight:700;color:var(--cp)">${kiMax}</div></div>
         <div style="flex:2">
@@ -2775,9 +2793,8 @@ function tabCombat(p){
           ${(()=>{const remaining=(p.combatCharges?.['Ki']!==undefined)?p.combatCharges['Ki']:kiMax;return`<div style="display:flex;gap:4px;flex-wrap:wrap">${Array.from({length:kiMax},(_,ki)=>`<span class="slot-bubble${ki<remaining?'':' used'}" onclick="toggleKi(${ki},${kiMax})" style="cursor:pointer"></span>`).join('')}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">${remaining}/${kiMax} pts disponibles</div><button class="btn bsm" style="margin-top:4px" onclick="P().combatCharges=P().combatCharges||{};P().combatCharges['Ki']=${kiMax};render()">↺ Repos court</button>`;})()}
         </div>
       </div>
-    </div>`:''}
-
-    ${bardeLvl>0?`<div class="panel mb10"><div class="pt">Inspiration bardique</div>
+    </div>`):''}
+  ${bardeLvl>0?cs('cs-barde',`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span>Inspiration bardique</div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div class="sb hi" style="flex:1;min-width:80px"><div class="sn">Dé</div><div style="font-size:18px;font-weight:700;color:var(--cp)">${bardDie}</div></div>
         <div style="flex:2">
@@ -2785,37 +2802,16 @@ function tabCombat(p){
           ${(()=>{const biUsed=(p.combatCharges||{})['Inspiration bardique']!==undefined?p.combatCharges['Inspiration bardique']:bardInspiUses;return`<div style="display:flex;gap:4px;flex-wrap:wrap">${Array.from({length:bardInspiUses},(_,bi)=>`<span class="slot-bubble${bi<biUsed?'':' used'}" onclick="useCombatCharge('Inspiration bardique',${bardInspiUses})"></span>`).join('')}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">${biUsed}/${bardInspiUses} • Lancer : <button class="btn bsm" onclick="rollCustomDmg('1${bardDie}','Inspiration bardique')">🎲 ${bardDie}</button></div><button class="btn bsm" style="margin-top:4px" onclick="recoverCombatCharge('Inspiration bardique',${bardInspiUses})">↺ Récupérer</button>`;})()}
         </div>
       </div>
-    </div>`:''}
-
-    ${(()=>{// Points de sorcellerie Ensorceleur
-      const sorcLvl=((p.classes||[]).find(c=>c.name==='Ensorceleur')||{}).level||0;
-      if(!sorcLvl)return'';
-      const sorcPtsMax=sorcLvl;
-      const sorcPts=(p.combatCharges||{})['SorcelleriePts']!==undefined?p.combatCharges['SorcelleriePts']:sorcPtsMax;
-      const sorcBubbles=Array.from({length:sorcPtsMax},(_,sp)=>`<span class="slot-bubble${sp<sorcPts?'':' used'}" onclick="toggleSorcPts(${sp},${sorcPtsMax})"></span>`).join('');
-      const flexButtons=[[1,2],[2,3],[3,5],[4,6],[5,7]].map(([niv,cout])=>`<button class="btn bsm" onclick="sorcCreateSlot(${niv},${cout},${sorcPtsMax})" ${sorcPts<cout?'disabled':''}>Niv.${niv} (${cout} pts)</button>`).join('');
-      return`<div class="panel mb10"><div class="pt">Points de sorcellerie — Ensorceleur</div>
+    </div>`):''}
+  ${(()=>{const sorcLvl=((p.classes||[]).find(c=>c.name==='Ensorceleur')||{}).level||0;if(!sorcLvl)return'';const sorcPtsMax=sorcLvl;const sorcPts=(p.combatCharges||{})['SorcelleriePts']!==undefined?p.combatCharges['SorcelleriePts']:sorcPtsMax;const sorcBubbles=Array.from({length:sorcPtsMax},(_,sp)=>`<span class="slot-bubble${sp<sorcPts?'':' used'}" onclick="toggleSorcPts(${sp},${sorcPtsMax})"></span>`).join('');const flexButtons=[[1,2],[2,3],[3,5],[4,6],[5,7]].map(([niv,cout])=>`<button class="btn bsm" onclick="sorcCreateSlot(${niv},${cout},${sorcPtsMax})" ${sorcPts<cout?'disabled':''}>Niv.${niv} (${cout} pts)</button>`).join('');return cs('cs-sorc',`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span>Points de sorcellerie — Ensorceleur</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${sorcBubbles}</div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:6px">${sorcPts}/${sorcPtsMax} pts • Repos long</div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Magie flexible — Créer un emplacement :</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${flexButtons}</div>
         <button class="btn bsm" onclick="P().combatCharges=P().combatCharges||{};P().combatCharges['SorcelleriePts']=${sorcPtsMax};render()">↺ Repos long</button>
-      </div>`;
-    })()}
-
-    <!-- Souffle draconique — Dragonide -->
-    ${(()=>{
-      if(p.race!=='Dragonide'||!p.draconicAncestry)return'';
-      const anc=SRD.draconicAncestries.find(a=>a.name===p.draconicAncestry);
-      if(!anc)return'';
-      const conM=p.abilities?Math.floor((p.abilities[2]-10)/2):0;
-      const dc=8+pb(lvl)+conM;
-      const diceCnt=lvl>=16?5:lvl>=11?4:lvl>=6?3:2;
-      const dmg=`${diceCnt}d6 ${anc.damage}`;
-      const used=(p.combatCharges||{})['SouffleDraconique']===true;
-      return`<div class="panel mb10">
-        <div class="pt" style="display:flex;align-items:center;justify-content:space-between">
-          <span>${anc.icon} Souffle draconique — ${esc(anc.name)}</span>
+      </div>`);})()}
+  ${(()=>{if(p.race!=='Dragonide'||!p.draconicAncestry)return'';const anc=SRD.draconicAncestries.find(a=>a.name===p.draconicAncestry);if(!anc)return'';const conM=p.abilities?Math.floor((p.abilities[2]-10)/2):0;const dc=8+pb(lvl)+conM;const diceCnt=lvl>=16?5:lvl>=11?4:lvl>=6?3:2;const dmg=`${diceCnt}d6 ${anc.damage}`;const used=(p.combatCharges||{})['SouffleDraconique']===true;return cs('cs-dragon',`<div class="panel mb10">
+        <div class="pt" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span><span>${anc.icon} Souffle draconique — ${esc(anc.name)}</span></div>
           <span style="font-size:10px;color:var(--cp);border:1px solid var(--cp);border-radius:10px;padding:2px 8px">1×/Repos</span>
         </div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:8px">
@@ -2827,38 +2823,27 @@ function tabCombat(p){
           <span style="font-size:12px;color:${used?'var(--text3)':'var(--cp)'}">${used?'Utilisé — Recharge au repos':'Disponible'}</span>
           <button class="btn bsm" onclick="rollCustomDmg('${diceCnt}d6','Souffle ${esc(anc.name)}')">🎲 ${esc(dmg)}</button>
         </div>
-        ${used?`<button class="btn bsm" style="margin-top:8px" onclick="P().combatCharges=P().combatCharges||{};delete P().combatCharges['SouffleDraconique'];saveAll();render();" >↺ Récupérer (Repos court/long)</button>`:''}
-      </div>`;
-    })()}
-
-    <!-- Emplacements Occultiste (récupérés au repos court) -->
-    ${warlockSlots?`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;justify-content:space-between"><span>Magie de pacte — Occultiste</span><span style="font-size:10px;color:var(--cp);border:1px solid var(--cp);border-radius:10px;padding:2px 8px">Repos court</span></div>
+        ${used?`<button class="btn bsm" style="margin-top:8px" onclick="P().combatCharges=P().combatCharges||{};delete P().combatCharges['SouffleDraconique'];saveAll();render();">↺ Récupérer (Repos court/long)</button>`:''}
+      </div>`);})()}
+  ${warlockSlots?cs('cs-warlock',`<div class="panel mb10"><div class="pt" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span><span>Magie de pacte — Occultiste</span></div><span style="font-size:10px;color:var(--cp);border:1px solid var(--cp);border-radius:10px;padding:2px 8px">Repos court</span></div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Niveau des emplacements : <strong style="color:var(--cp)">${warlockSlots[1]}</strong></div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="display:flex;gap:4px">${Array.from({length:warlockSlots[0]},(_,si)=>`<span class="slot-bubble${si<(slotsUsed[9]||0)?' used':''}" onclick="toggleWarlockSlot(${si},${warlockSlots[0]})" style="width:16px;height:16px"></span>`).join('')}</div>
         <span style="font-size:11px;color:var(--text3)">${warlockSlots[0]-(slotsUsed[9]||0)}/${warlockSlots[0]} emplacement${warlockSlots[0]>1?'s':''}</span>
         <button class="btn bsm" onclick="P().spellSlotsUsed=P().spellSlotsUsed||[];P().spellSlotsUsed[9]=0;render()">↺ Repos court</button>
       </div>
-    </div>`:''}
-
-    <!-- Sorts -->
-    ${hasCaster?`<div class="panel"><div class="pt">Sorts</div>
+    </div>`):''}
+  ${hasCaster?cs('cs-sorts',`<div class="panel"><div class="pt" style="display:flex;align-items:center;gap:6px"><span class="mj-drag-handle" title="Déplacer">⠿</span>Sorts</div>
       <div class="g3 mb10">
         <div class="sb hi"><div class="sn">Bonus sort</div><div style="font-size:18px;font-weight:600;color:var(--cp)">${fmt(pb(lvl)+spellMod)}</div></div>
         <div class="sb hi"><div class="sn">DD sort</div><div style="font-size:18px;font-weight:600;color:var(--cp)">${8+pb(lvl)+spellMod}</div></div>
         <div class="sb"><div class="sn">Mod.</div><div style="font-size:14px;font-weight:600">${fmt(spellMod)}</div></div>
       </div>
       ${slots?`<div style="margin-bottom:10px"><div class="fl mb6">Emplacements</div>${slots.map((total,ni)=>total?`<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:11px;color:var(--text2);width:50px">Niv. ${ni+1}</span><div>${Array.from({length:total},(_,si)=>`<span class="slot-bubble${si<(slotsUsed[ni]||0)?' used':''}" onclick="toggleSlot(${ni},${si},${total})"></span>`).join('')}</div><span style="font-size:10px;color:var(--text3)">${slotsUsed[ni]||0}/${total}</span></div>`:'').join('')}<button class="btn bsm" style="margin-top:4px" onclick="upd('spellSlotsUsed',[]);render()">Récupérer tous</button></div>`:''}
-      ${(()=>{// Sorts préparés Magicien
-        const magLvl=((p.classes||[]).find(c=>c.name==='Magicien')||{}).level||0;
-        if(!magLvl)return'';
-        const prepMax=Math.max(1,intM+magLvl);
-        const known=(p.spells||[]).filter(s=>{const sp=findSpellData(s.name);return sp&&sp.level>0;}).length;
-        return`<div style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text2)">📚 Sorts préparés : <strong style="color:${known>prepMax?'#e53935':'var(--cp)'}">${known}/${prepMax}</strong> (INT ${fmt(intM)} + niv. ${magLvl})</div>`;
-      })()}
+      ${(()=>{const magLvl=((p.classes||[]).find(c=>c.name==='Magicien')||{}).level||0;if(!magLvl)return'';const prepMax=Math.max(1,intM+magLvl);const known=(p.spells||[]).filter(s=>{const sp=findSpellData(s.name);return sp&&sp.level>0;}).length;return`<div style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text2)">📚 Sorts préparés : <strong style="color:${known>prepMax?'#e53935':'var(--cp)'}">${known}/${prepMax}</strong> (INT ${fmt(intM)} + niv. ${magLvl})</div>`;})()}
       ${renderSpellList(p, true)}
-    </div>`:''}
-  </div></div>`;
+    </div>`):''}
+  </div>`;
 }
 
 function rollCustomDmg(dice,name){
@@ -2879,7 +2864,7 @@ function toggleWarlockSlot(si,total){const p=P();if(!p.spellSlotsUsed)p.spellSlo
 function toggleKi(idx,max){const p=P();if(!p.combatCharges)p.combatCharges={};const cur=p.combatCharges['Ki']!==undefined?p.combatCharges['Ki']:max;p.combatCharges['Ki']=idx<cur?idx:Math.min(max,idx+1);render();}
 function toggleSorcPts(idx,max){const p=P();if(!p.combatCharges)p.combatCharges={};const cur=p.combatCharges['SorcelleriePts']!==undefined?p.combatCharges['SorcelleriePts']:max;p.combatCharges['SorcelleriePts']=idx<cur?idx:Math.min(max,idx+1);render();}
 function sorcCreateSlot(niv,cout,max){const p=P();if(!p.combatCharges)p.combatCharges={};const cur=p.combatCharges['SorcelleriePts']!==undefined?p.combatCharges['SorcelleriePts']:max;if(cur<cout){showToast('❌ Pas assez de points ('+cout+' requis)');return;}p.combatCharges['SorcelleriePts']=cur-cout;if(!p.spellSlotsUsed)p.spellSlotsUsed=[];p.spellSlotsUsed[niv-1]=Math.max(0,(p.spellSlotsUsed[niv-1]||1)-1);render();showToast('✓ Emplacement niv.'+niv+' créé (−'+cout+' pts)');}
-function rollAttack(name,bonus,dmg){
+function rollAttack(name,bonus,dmg,slot){
   const atk=Math.ceil(Math.random()*20);
   const total=atk+bonus;
   const isCrit=atk===20;const isFumble=atk===1;
@@ -2899,11 +2884,30 @@ function rollAttack(name,bonus,dmg){
   }
   const el=document.getElementById('rollResult');
   if(el){el.style.display='block';el.innerHTML=`<div>⚔ ${esc(name)} — d20(${atk})${fmt(bonus)} = <span style="font-size:20px;color:${col};font-weight:800">${total}</span>${isCrit?' 🎉 CRITIQUE!':isFumble?' 💀 FUMBLE!':''}</div>${dmgHtml}`;}
+  if(slot==='ranged'){const p=P();const eq=(p.equip||{})[slot];if(eq&&eq.ammoLink){const ai=(p.inventory||[]).findIndex(i=>i.name===eq.ammoLink);if(ai>=0){p.inventory[ai].qty=Math.max(0,p.inventory[ai].qty-1);if(p.inventory[ai].qty===0)showToast('⚠️ Plus de '+eq.ammoLink+' !');saveAll();}}}
   diceHistory.push({die:'d20',label:name,roll:atk,bonus,result:total});
   if(diceHistory.length>10)diceHistory.shift();
   if(diceOpen)renderDicePanel();
 }
 function rollDie(d){const n=parseInt(d.replace('d',''));const r=Math.ceil(Math.random()*n);const el=document.getElementById('rollResult');if(el){el.style.display='block';el.innerHTML=`${d}: <strong>${r}</strong>`;}}
+function openLinkAmmoModal(){
+  const p=P();const inv=(p.inventory||[]).filter(i=>i.name&&i.qty>0);
+  openModal(`<div class="pt">🏹 Lier des munitions à l'arme à distance</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Sélectionnez l'objet de munitions dans votre sac :</div>
+    ${inv.length?inv.map(item=>`<div class="aci" onclick="linkRangedAmmo('${esc(item.name)}')">
+      <div class="ain">${esc(item.name)}</div>
+      <div class="ais">Quantité : ${item.qty}</div>
+    </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:8px">Sac vide.</div>`}
+    <button class="btn bsm bdanger" style="margin-top:8px;width:100%" onclick="closeModal()">Annuler</button>`);
+}
+function linkRangedAmmo(itemName){
+  const p=P();if(!p.equip)p.equip={};if(!p.equip.ranged)return;
+  p.equip.ranged.ammoLink=itemName;closeModal();render();
+  showToast(`✓ Munitions liées : ${itemName}`);
+}
+function unlinkRangedAmmo(){
+  const p=P();if(p.equip&&p.equip.ranged)delete p.equip.ranged.ammoLink;render();
+}
 function rollSave(ab,m){const r=Math.ceil(Math.random()*20);showToast(`JS ${ab}: d20(${r}) ${fmt(m)} = <strong>${r+m}</strong>${r===20?' 🎉':r===1?' 💀':''}`);}
 
 function rollSpellPlayer(name,dmgStr,saveStat){
@@ -3059,11 +3063,13 @@ function tabSorts(p){
   const prepCaster = isPrepCaster(p);
 
   // Sous-tabs
-  const subBar = `<div style="display:flex;gap:6px;margin-bottom:12px">
+  const hasMultiSubs=userIsMJ||magLvl>0;
+  if(!hasMultiSubs)_sortSubTab='mes-sorts';
+  const subBar = hasMultiSubs?`<div style="display:flex;gap:6px;margin-bottom:12px">
     <button class="btn${_sortSubTab==='mes-sorts'?' bprimary':''}" onclick="_sortSubTab='mes-sorts';render()" style="flex:1">📖 Mes sorts</button>
     ${userIsMJ?`<button class="btn${_sortSubTab==='compendium'?' bprimary':''}" onclick="_sortSubTab='compendium';render()" style="flex:1">📚 Ajouter (MJ)</button>`:''}
     ${magLvl?`<button class="btn${_sortSubTab==='apprendre'?' bprimary':''}" onclick="_sortSubTab='apprendre';render()" style="flex:1">📜 Apprendre</button>`:''}
-  </div>`;
+  </div>`:'';
 
   if(_sortSubTab === 'compendium' && userIsMJ){
     return`<div>${subBar}${renderCompendiumSearch(p)}</div>`;
@@ -3374,36 +3380,33 @@ function tabSac(p){
       <span style="font-size:10px;color:var(--text3)">${item.charges-(item.chargesUsed||0)}/${item.charges}</span>
     </div>`:''}
   </div>`).join(''):`<div style="font-size:12px;color:var(--text3);font-style:italic">Inventaire vide.</div>`;
-  return`<div class="g2" style="gap:10px">
-  <div>
-    <div class="panel mb10"><div class="pt">Monnaie</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-        ${[['pc','Cuivre'],['pa','Argent'],['pe','Électrum'],['po','Or'],['pp','Platine']].map(([k,lbl])=>`<div class="coin"><div class="coin-lbl">${lbl}</div><input class="coin-val" type="number" min="0" value="${cur[k]||0}" oninput="p.currency['${k}']=parseInt(this.value)||0"></div>`).join('')}
-      </div>
-    </div>
-    <div class="panel">
-      <div class="pt" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span>Inventaire</span>
-        ${isMJ()?`<button class="btn bsm bac" onclick="openMJCreateItem()">🎲 Créer objet/arme</button>`:''}
-      </div>
-      <div style="display:flex;gap:6px;margin-bottom:4px">
-        <input class="fi" id="invName" placeholder="${ITEMS_DB?'Nom ou recherche parmi '+ITEMS_DB.length.toLocaleString()+' objets...':'Nom ou recherche compendium...'}" oninput="filterSrdItems(this.value)" style="flex:1">
-        <button class="btn bsm bac" onclick="addInvItem()">+</button>
-      </div>
-      ${!ITEMS_DB?`<button class="btn bsm" style="font-size:11px;width:100%;margin-bottom:6px" onclick="loadItemsDB(()=>render())">📚 Charger le compendium (16 419 objets)</button>`:''}
-      <div id="srdList" style="margin-bottom:8px;max-height:220px;overflow-y:auto">${renderSrdList('')}</div>
-      ${invRows}
+  return`<div>
+  <div class="panel mb10"><div class="pt">Monnaie</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+      ${[['pc','Cuivre'],['pa','Argent'],['pe','Électrum'],['po','Or'],['pp','Platine']].map(([k,lbl])=>`<div class="coin"><div class="coin-lbl">${lbl}</div><input class="coin-val" type="number" min="0" value="${cur[k]||0}" oninput="p.currency['${k}']=parseInt(this.value)||0"></div>`).join('')}
     </div>
   </div>
-  <div>
-    ${isMJ()&&mjPool.customItems.length?`<div class="panel">
-      <div class="pt">Objets personnalisés (pool MJ)</div>
-      ${mjPool.customItems.slice(-10).map((item,i)=>`<div class="aci" onclick="addPoolItemToSac(${mjPool.customItems.length-10+i})">
-        <div class="ain">${esc(item.name)}${item.magic?' ✨':''}</div>
-        <div class="ais">${esc(item.desc||'').slice(0,60)}</div>
-      </div>`).join('')}
-    </div>`:''}
-  </div></div>`;
+  <div class="panel">
+    <div class="pt" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span>Inventaire</span>
+      ${isMJ()?`<button class="btn bsm bac" onclick="openMJCreateItem()">🎲 Créer objet/arme</button>`:''}
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:4px">
+      <input class="fi" id="invName" placeholder="${ITEMS_DB?'Nom ou recherche parmi '+ITEMS_DB.length.toLocaleString()+' objets...':'Nom ou recherche compendium...'}" oninput="filterSrdItems(this.value)" style="flex:1">
+      <button class="btn bsm bac" onclick="addInvItem()">+</button>
+    </div>
+    ${!ITEMS_DB?`<button class="btn bsm" style="font-size:11px;width:100%;margin-bottom:6px" onclick="loadItemsDB(()=>render())">📚 Charger le compendium (16 419 objets)</button>`:''}
+    <div id="srdList" style="margin-bottom:8px;max-height:220px;overflow-y:auto">${renderSrdList('')}</div>
+    ${invRows}
+  </div>
+  ${isMJ()&&mjPool.customItems.length?`<div class="panel" style="margin-top:8px">
+    <div class="pt">Objets personnalisés (pool MJ)</div>
+    ${mjPool.customItems.slice(-10).map((item,i)=>`<div class="aci" onclick="addPoolItemToSac(${mjPool.customItems.length-10+i})">
+      <div class="ain">${esc(item.name)}${item.magic?' ✨':''}</div>
+      <div class="ais">${esc(item.desc||'').slice(0,60)}</div>
+    </div>`).join('')}
+  </div>`:''}
+  </div>`;
 }
 function toggleItemCharge(itemIdx,chargeIdx){
   const p=P();const item=p.inventory[itemIdx];if(!item)return;
