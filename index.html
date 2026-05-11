@@ -988,9 +988,11 @@ async function confirmJoinTable(){
 }
 async function doJoinTable(code){
   try{
+    if(currentUserData&&currentUserData.role==='MJ'){showToast('❌ Les Maîtres de Jeu ne peuvent pas rejoindre la table d\'un autre MJ.');closeModal();return;}
     const snap=await fbDb.collection('tables').where('inviteCode','==',code).limit(1).get();
     if(snap.empty){showToast('❌ Code invalide.');return;}
     const tableDoc=snap.docs[0];
+    if(tableDoc.data().mjId===currentUser.uid){showToast('Vous êtes déjà le MJ de cette table.');closeModal();return;}
     const members=tableDoc.data().memberIds||[];
     if(members.includes(currentUser.uid)){showToast('Vous êtes déjà dans cette table.');closeModal();return;}
     await tableDoc.ref.update({
@@ -4559,6 +4561,13 @@ function toggleDicePanel(){
 function renderDicePanel(){
   const panel=document.getElementById('dicePanel');if(!panel)return;
   const p=P();
+  if(!p||!p.abilities){
+    panel.innerHTML=`<div style="font-family:var(--F);font-size:13px;color:var(--cp);letter-spacing:.06em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><span>🎲 Lanceur de dés</span><span onclick="toggleDicePanel()" style="cursor:pointer;color:var(--text3);font-size:16px">×</span></div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${['d4','d6','d8','d10','d12','d20','d100'].map(d=>`<button onclick="diceRollFree('${d}')" style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;background:var(--surface2);color:var(--text2);font-family:var(--B)" onmouseenter="this.style.borderColor='var(--cp)';this.style.color='var(--cp)'" onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">${d}</button>`).join('')}</div>
+    <div id="diceResultFree" style="padding:8px;background:var(--surface2);border-radius:6px;display:none;font-size:14px;font-weight:600;color:var(--cp);text-align:center;margin-bottom:8px"></div>
+    <div style="font-size:11px;color:var(--text3);text-align:center;font-style:italic">Entrez dans une campagne pour les jets de caractéristiques.</div>`;
+    return;
+  }
   const mc=mainClass(p);const lvl=totalLevel(p);
   const saves=CLASS_SAVES[mc?mc.name:'']||[];
 
@@ -4728,6 +4737,12 @@ function diceRoll(die,label,bonus=0,rollType=''){
   if(diceOpen)renderDicePanel();
 }
 
+function diceRollFree(d){
+  const n=parseInt(d.replace('d',''));
+  const r=Math.ceil(Math.random()*n);
+  const el=document.getElementById('diceResultFree');
+  if(el){el.style.display='block';el.innerHTML=`🎲 ${d} : <strong style="font-size:18px">${r}</strong>${r===n?' 🎉':r===1&&n>4?' 💀':''}`;}
+}
 function diceRollCustom(){
   const qty=parseInt(document.getElementById('diceQty')?.value)||1;
   const die=document.getElementById('diceType')?.value||'d20';
@@ -5415,6 +5430,7 @@ function mjTabCombat(){
         <button class="btn bsm" style="padding:2px 7px;font-size:14px" onclick="mjHpChange(${realIdx},1)">+</button>
         <button class="btn bsm" style="font-size:10px;padding:2px 6px" onclick="mjOpenHpModal(${realIdx})">✏</button>
         <button class="btn bsm" style="font-size:10px;padding:2px 6px" onclick="mjOpenCondModal(${realIdx})">⚠</button>
+        <button class="btn bsm" style="font-size:10px;padding:2px 6px;border-color:var(--cp);color:var(--cp)" onclick="mjOpenCombatDice(${realIdx})">🎲</button>
         <button class="btn bsm" style="font-size:10px;padding:2px 6px;color:#e53935;border-color:#e53935" onclick="mjRemoveCombatant(${realIdx})">✕</button>
       </div>
       <div style="width:36px;text-align:center;font-size:11px;color:var(--text3)">CA ${c.ac||0}</div>
@@ -5447,7 +5463,7 @@ function mjAddPlayerToCombat(idx){
   const p=pp.charData||{};
   if(_mjCombatants.find(c=>c.uid===pp.uid)){showToast('Déjà dans le combat.');return;}
   const mods=(p.abilities||[0,0,0,0,0,0]).map(v=>Math.floor((v-10)/2));
-  _mjCombatants.push({id:'player_'+pp.uid,name:p.charName||pp.playerName||'Joueur',hp:p.hp||p.hpMax||1,hpMax:p.hpMax||1,ac:p.ac||10,initiative:0,dexMod:mods[1]||0,conditions:[],isPlayer:true,avatar:pp.avatar||'⚔',uid:pp.uid});
+  _mjCombatants.push({id:'player_'+pp.uid,name:p.charName||pp.playerName||'Joueur',hp:p.hp||p.hpMax||1,hpMax:p.hpMax||1,ac:p.ac||10,initiative:0,dexMod:mods[1]||0,conditions:[],isPlayer:true,avatar:pp.avatar||'⚔',uid:pp.uid,abilities:p.abilities||[10,10,10,10,10,10]});
   _mjCombatLog.push(`⚔ ${esc(p.charName||pp.playerName)} ajouté au combat.`);
   renderMJContent();
 }
@@ -5505,6 +5521,10 @@ function mjFillMonster(idx){
   const ac=parseInt(m.ac)||13;
   const hp=parseInt(m.hp)||10;
   const dexMod=Math.floor(((parseInt(m.dex)||10)-10)/2);
+  window._mjPendingAbilities=[
+    parseInt(m.str)||10,parseInt(m.dex)||10,parseInt(m.con)||10,
+    parseInt(m.int)||10,parseInt(m.wis)||10,parseInt(m.cha)||10
+  ];
   const nameEl=document.getElementById('mAdd_name');
   const hpEl=document.getElementById('mAdd_hp');
   const acEl=document.getElementById('mAdd_ac');
@@ -5523,9 +5543,11 @@ function mjConfirmAddMonster(){
   const ac=parseInt(document.getElementById('mAdd_ac').value)||13;
   const initBonus=parseInt(document.getElementById('mAdd_init').value)||0;
   const qty=Math.max(1,Math.min(20,parseInt(document.getElementById('mAdd_qty').value)||1));
+  const abilities=window._mjPendingAbilities||[10,10+(initBonus*2),10,10,10,10];
+  window._mjPendingAbilities=null;
   for(let i=0;i<qty;i++){
     const label=qty>1?name+' '+(i+1):name;
-    _mjCombatants.push({id:'monster_'+Date.now()+'_'+i,name:label,hp,hpMax:hp,ac,initiative:0,dexMod:initBonus,conditions:[],isPlayer:false});
+    _mjCombatants.push({id:'monster_'+Date.now()+'_'+i,name:label,hp,hpMax:hp,ac,initiative:0,dexMod:initBonus,conditions:[],isPlayer:false,abilities:[...abilities]});
   }
   _mjCombatLog.push(`👾 ${qty>1?qty+'× ':''}"${esc(name)}" ajouté(s) au combat.`);
   closeModal();renderMJContent();
@@ -5553,6 +5575,60 @@ function mjResetCombat(){
   if(!confirm('Réinitialiser le combat ?'))return;
   _mjCombatants=[];_mjCombatStarted=false;_mjCurrentTurn=0;_mjRound=1;_mjCombatLog=[];
   renderMJContent();
+}
+
+// ─── JETS DE DÉS PAR COMBATTANT ───
+function mjOpenCombatDice(idx){
+  const c=_mjCombatants[idx];if(!c)return;
+  const ab=c.abilities||[10,10,10,10,10,10];
+  const mods=ab.map(v=>Math.floor((v-10)/2));
+  const AB=['FOR','DEX','CON','INT','SAG','CHA'];
+  const btnStyle='padding:8px 4px;text-align:center;width:100%';
+  const makeBtn=(label,bonus,fn)=>`<button class="btn" style="${btnStyle}" onclick="${fn}(${idx},'${label}',${bonus})"><div style="font-size:11px;font-weight:700">${label}</div><div style="font-size:12px;color:var(--cp)">${fmt(bonus)}</div></button>`;
+  openWideModal(`<div class="pt">🎲 Jets — ${esc(c.name)}</div>
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Caractéristiques</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:12px">
+      ${AB.map((a,i)=>makeBtn(a,mods[i],'mjCombatRoll')).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Jets de sauvegarde</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:12px">
+      ${AB.map((a,i)=>makeBtn('JS '+a,mods[i],'mjCombatRoll')).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Attaque (d20) — bonus</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;align-items:center">
+      <input id="mjAtkBonus" type="number" value="0" style="width:56px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 6px;color:var(--text);font-size:13px;text-align:center;outline:none">
+      <button class="btn bac" style="flex:1" onclick="mjCombatAtkRoll(${idx})">🎯 Lancer l'attaque</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Dés libres</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">
+      ${['d4','d6','d8','d10','d12','d20','d100'].map(d=>`<button class="btn" style="padding:5px 9px;font-size:12px" onclick="mjCombatRollFree(${idx},'${d}')">${d}</button>`).join('')}
+    </div>
+    <div id="mjDiceResult" style="display:none;padding:10px;background:var(--surface2);border-radius:8px;text-align:center;font-size:14px;font-weight:600;color:var(--cp);margin-bottom:10px"></div>
+    <div style="text-align:right"><button class="btn bsm" onclick="closeModal()">Fermer</button></div>`);
+}
+function mjCombatRoll(idx,label,bonus){
+  const c=_mjCombatants[idx];if(!c)return;
+  const r=Math.ceil(Math.random()*20);
+  const total=r+bonus;
+  const isCrit=r===20;const isFumble=r===1;
+  const col=isCrit?'#ffd54f':isFumble?'#e53935':'var(--cp)';
+  const el=document.getElementById('mjDiceResult');
+  if(el){el.style.display='block';el.innerHTML=`<strong>${esc(c.name)}</strong> — ${label}<br>d20(${r}) ${fmt(bonus)} = <span style="font-size:20px;color:${col}">${total}</span>${isCrit?' 🎉 CRITIQUE!':isFumble?' 💀 FUMBLE!':''}`;}
+  _mjCombatLog.push(`🎲 ${esc(c.name)} ${label} : ${r}${bonus?fmt(bonus):''} = <b>${total}</b>${isCrit?' 🎉':isFumble?' 💀':''}`);
+}
+function mjCombatAtkRoll(idx){
+  const c=_mjCombatants[idx];if(!c)return;
+  const bonus=parseInt(document.getElementById('mjAtkBonus')?.value)||0;
+  mjCombatRoll(idx,'Attaque',bonus);
+}
+function mjCombatRollFree(idx,d){
+  const c=_mjCombatants[idx];if(!c)return;
+  const n=parseInt(d.replace('d',''));
+  const r=Math.ceil(Math.random()*n);
+  const isCrit=r===n&&n>4;const isFumble=r===1&&n>4;
+  const el=document.getElementById('mjDiceResult');
+  if(el){el.style.display='block';el.innerHTML=`<strong>${esc(c.name)}</strong> — ${d}<br><span style="font-size:20px">${r}</span>${isCrit?' 🎉':isFumble?' 💀':''}`;}
+  _mjCombatLog.push(`🎲 ${esc(c.name)} ${d} : <b>${r}</b>${isCrit?' 🎉':isFumble?' 💀':''}`);
 }
 
 function mjRemoveCombatant(idx){
@@ -5753,7 +5829,7 @@ async function mjDeleteNPC(i){
 
 function mjAddNPCToCombat(i){
   const n=_mjNPCs[i];if(!n)return;
-  _mjCombatants.push({id:'npc_'+i+'_'+Date.now(),name:n.name||'PNJ',hp:n.hp||10,hpMax:n.hp||10,ac:n.ac||13,initiative:0,dexMod:0,conditions:[],isPlayer:false});
+  _mjCombatants.push({id:'npc_'+i+'_'+Date.now(),name:n.name||'PNJ',hp:n.hp||10,hpMax:n.hp||10,ac:n.ac||13,initiative:0,dexMod:0,conditions:[],isPlayer:false,abilities:[10,10,10,10,10,10]});
   _mjCombatLog.push(`🐉 "${esc(n.name||'PNJ')}" ajouté au combat.`);
   setMJTab('combat');showToast('✅ Ajouté au combat !');
 }
