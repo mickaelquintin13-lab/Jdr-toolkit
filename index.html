@@ -517,7 +517,8 @@ function openUserSettings(){
         <div style="font-size:11px;color:var(--text3)">${esc(c.charClass||'')} • ${esc(c.campaignName||'')} (${esc(c.tableName||'')})</div>
       </div>
       <span style="color:var(--cp);font-size:11px">Jouer →</span>
-      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-left:6px;flex-shrink:0" onclick="event.stopPropagation();deleteCharFromLib('${campId}')">🗑</button>
+      <button class="btn bsm" style="flex-shrink:0" onclick="event.stopPropagation();exportCharacter('${campId}')" title="Exporter en JSON">⬇</button>
+      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-left:4px;flex-shrink:0" onclick="event.stopPropagation();deleteCharFromLib('${campId}')">🗑</button>
     </div>`).join('')
     :`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucun personnage sauvegardé.</div>`;
   openModal(`<div class="pt">⚙ Paramètres du profil</div>
@@ -565,6 +566,73 @@ async function enterCampaignFromLib(campaignId, tableName, campaignName){
   }
   if(tableId) await enterCampaign(tableId,campaignId,tableName,campaignName);
   else showToast('❌ Table introuvable.');
+}
+
+// ─── EXPORT / IMPORT PERSONNAGE ───
+async function exportCharacter(campId){
+  const charName=(currentUserData&&currentUserData.charLib&&currentUserData.charLib[campId]&&currentUserData.charLib[campId].charName)||'personnage';
+  try{
+    const doc=await fbDb.collection('characters').doc(currentUser.uid+'_'+campId).get();
+    if(!doc.exists){showToast('❌ Personnage introuvable.');return;}
+    const data=doc.data().characterData||{};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=charName.replace(/[^a-z0-9àâäéèêëîïôöùûüç]/gi,'_')+'.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('✅ Personnage exporté.');
+  }catch(e){showToast('❌ Erreur export : '+e.message);}
+}
+
+function openCharOrCreate(tableId,campId){
+  const charLib=(currentUserData&&currentUserData.charLib)||{};
+  const others=Object.entries(charLib).filter(([cid])=>cid!==campId);
+  const existingSection=others.length?`
+    <div style="margin-bottom:14px">
+      <div class="fl mb6" style="margin-bottom:8px">Utiliser un personnage existant</div>
+      ${others.map(([cid,c])=>`<div class="charlib-item" style="cursor:pointer" onclick="useExistingCharForCampaign('${cid}','${tableId}','${campId}')">
+        <span style="font-size:18px">${(currentUserData&&currentUserData.avatar)||'⚔'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${esc(c.charName||'?')}</div>
+          <div style="font-size:11px;color:var(--text3)">${esc(c.charClass||'')} • ${esc(c.campaignName||'')}</div>
+        </div>
+        <span style="color:var(--cp);font-size:11px">Utiliser →</span>
+      </div>`).join('')}
+    </div>`:'';
+  openModal(`<div class="pt">+ Rejoindre la campagne</div>
+    ${existingSection}
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn bac" style="width:100%" onclick="closeModal();enterCampaign('${tableId}','${campId}')">✨ Créer un nouveau personnage</button>
+      <button class="btn" style="width:100%" onclick="importCharForCampaign('${tableId}','${campId}')">📥 Importer depuis un fichier JSON</button>
+    </div>`);
+}
+
+async function useExistingCharForCampaign(sourceCampId,tableId,campId){
+  closeModal();
+  try{
+    const doc=await fbDb.collection('characters').doc(currentUser.uid+'_'+sourceCampId).get();
+    if(!doc.exists){showToast('❌ Personnage introuvable.');return;}
+    const data=JSON.parse(JSON.stringify(doc.data().characterData||{}));
+    await enterCampaign(tableId,campId,null,null,data);
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
+
+function importCharForCampaign(tableId,campId){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.json,application/json';
+  input.onchange=async e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    try{
+      const text=await file.text();
+      const data=JSON.parse(text);
+      closeModal();
+      await enterCampaign(tableId,campId,null,null,data);
+    }catch(err){showToast('❌ Fichier JSON invalide.');}
+  };
+  input.click();
 }
 
 // ─── HUB : TABLES & CAMPAGNES ───
@@ -693,7 +761,7 @@ function renderHubHTML(tables,isMJ){
                 <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.35);flex-shrink:0" onclick="playerLeaveCharacter('${c.id}')">✕ Quitter</button>
                 <button class="btn bac bsm" style="flex-shrink:0" onclick="enterCampaign('${t.id}','${c.id}')">▶ Jouer</button>
               </div>`
-            :`<button class="btn bprimary" style="width:100%;margin-top:8px" onclick="enterCampaign('${t.id}','${c.id}')">+ Créer mon personnage</button>`);
+            :`<button class="btn bprimary" style="width:100%;margin-top:8px" onclick="openCharOrCreate('${t.id}','${c.id}')">+ Créer mon personnage</button>`);
         const mjEditHtml=isMJ?`
           <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn bsm" onclick="openEditCampaign('${t.id}','${c.id}')">✏ Modifier</button>
@@ -1026,7 +1094,7 @@ function copyInviteLink(code){
 }
 
 // ─── ENTRER DANS UNE CAMPAGNE ───
-async function enterCampaign(tableId,campaignId,tName,cName){
+async function enterCampaign(tableId,campaignId,tName,cName,preloadedCharData){
   currentTableId=tableId;
   currentCampaignId=campaignId;
   if(!tName&&_hubCache){const t=_hubCache.find(t=>t.id===tableId);if(t){tName=t.name;const c=t.campaigns.find(c=>c.id===campaignId);if(c)cName=c.name;}}
@@ -1063,7 +1131,7 @@ async function enterCampaign(tableId,campaignId,tName,cName){
         const d=charDoc.data();
         state.players=[migratePlayer(d.characterData)];
       }else{
-        state.players=[defPlayer(currentUserData?currentUserData.displayName:'Personnage')];
+        state.players=[migratePlayer(preloadedCharData||defPlayer(currentUserData?currentUserData.displayName:'Personnage'))];
       }
       state.activeIdx=0;state.activeTab='perso';
       _mjJournal=[];_journalSubTab='mj';_compilationData=null;
