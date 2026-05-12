@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>D&D 5e — Fiche</title>
+<title>La Boîte à Outils</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -182,7 +182,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
   background:
     radial-gradient(ellipse at 15% 80%, rgba(180,90,10,.25) 0%, transparent 50%),
     radial-gradient(ellipse at 85% 15%, rgba(210,130,20,.15) 0%, transparent 45%),
-    linear-gradient(rgba(6,4,2,.62), rgba(6,4,2,.62)),
+    linear-gradient(rgba(6,4,2,.38), rgba(6,4,2,.38)),
     url('bg-login.png') center/cover fixed;
 }
 .tavern-bg::before{
@@ -333,7 +333,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 <!-- ÉCRAN DE CONNEXION -->
 <div id="authScreen" class="tavern-bg" style="display:none">
   <div class="auth-box">
-    <div class="auth-title">⚔ JDR Toolkit</div>
+    <div class="auth-title">🧰 La Boîte à Outils</div>
     <div class="auth-sub">Votre compagnon de table pour D&D 5e</div>
     <div class="auth-tab">
       <button id="authTabLogin" class="on" onclick="switchAuthTab('login')">Connexion</button>
@@ -381,7 +381,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 <!-- HUB : TABLES & CAMPAGNES -->
 <div id="hubScreen" class="tavern-bg">
   <div class="hub-hdr">
-    <span class="hub-hdr-title">⚔ JDR Toolkit</span>
+    <span class="hub-hdr-title">🧰 La Boîte à Outils</span>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <div id="hubMJBadge" style="display:none;align-items:center;gap:5px;padding:3px 10px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;font-size:11px;color:var(--cp);font-family:var(--F);letter-spacing:.06em">🎲 Maître de Jeu</div>
       <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">⚔ Profil</button>
@@ -396,7 +396,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 <!-- ÉCRAN MJ -->
 <div id="mjScreen" style="display:none">
   <div class="mj-hdr">
-    <button class="btn bsm" onclick="showHub()" style="border-color:var(--cp);color:var(--cp);font-weight:600;flex-shrink:0" title="Retour aux tables">🏠 Tables</button>
+    <button class="btn bsm" onclick="showHub()" style="border-color:var(--cp);color:var(--cp);font-weight:600;flex-shrink:0" title="Retour aux tables">🧰 Tables</button>
     <span class="mj-hdr-title" style="margin-left:8px;flex-shrink:0">🎲 MJ</span>
     <span id="mjHdrCamp" style="font-size:12px;color:var(--text2);flex:1;margin:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
     <button class="hub-user-btn" onclick="openUserSettings()" title="Profil &amp; Déconnexion" style="flex-shrink:0">👤 Profil</button>
@@ -408,7 +408,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 <!-- APPLICATION PRINCIPALE -->
 <div id="app" style="display:none">
   <div class="hdr">
-    <button class="btn bsm" onclick="showHub()" style="border-color:var(--cp);color:var(--cp);font-weight:600;flex-shrink:0" title="Retour aux tables">🏠 Tables</button>
+    <button class="btn bsm" onclick="showHub()" style="border-color:var(--cp);color:var(--cp);font-weight:600;flex-shrink:0" title="Retour aux tables">🧰 Tables</button>
     <span class="hdr-char" id="hdrChar" style="flex:1;text-align:center">Fiche de personnage</span>
     <span id="hdrUser" style="display:none"></span>
     <button class="btn bsm" id="mjBtn" onclick="toggleMJ()" style="border-color:var(--cp);color:var(--cp);flex-shrink:0">🎲 MJ</button>
