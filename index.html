@@ -385,7 +385,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <div id="hubMJBadge" style="display:none;align-items:center;gap:5px;padding:3px 10px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;font-size:11px;color:var(--cp);font-family:var(--F);letter-spacing:.06em">🎲 Maître de Jeu</div>
       <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">⚔ Profil</button>
-      <button class="btn bsm" onclick="doLogout()" style="font-size:11px">Déconnexion</button>
+      <button class="btn bsm" onclick="doLogout()" title="Déconnexion" style="color:#e53935;border-color:rgba(229,57,53,.3);padding:3px 8px">🚪</button>
     </div>
   </div>
   <div class="hub-body">
@@ -561,7 +561,7 @@ function openUserSettings(){
       </div>
       <span style="color:var(--cp);font-size:11px;flex-shrink:0">${actionLabel}</span>
       <button class="btn bsm" style="flex-shrink:0;margin-left:4px" onclick="event.stopPropagation();exportCharacter('${campId}')" title="Exporter en JSON">⬇</button>
-      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-left:4px;flex-shrink:0" onclick="event.stopPropagation();deleteCharFromLib('${campId}')">🗑</button>
+      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-left:4px;flex-shrink:0" onclick="event.stopPropagation();deleteCharFromLib('${campId}')" title="Supprimer ce personnage">🗑</button>
     </div>`;}).join('')
     :`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:6px 0">Aucun personnage sauvegardé.</div>`;
   openModal(`<div class="pt" style="margin-bottom:12px">⚙ Paramètres du profil</div>
@@ -3441,7 +3441,7 @@ function tabEquipement(p){
   const eq=p.equip||{};
   const slotHtml=s=>{const item=eq[s.id];const isMagic=item&&item.magic;return`<div class="eq-slot${item?' filled':''}${isMagic?' magic-slot':''}" style="${isMagic?'border-color:#9b59b6':''}" onclick="openEquipSlot('${s.id}')">
     <div class="eq-slot-label">${s.icon} ${s.label}</div>
-    ${item?`<div class="eq-slot-item">${esc(item.name)}${isMagic?' ✨':''}</div><span onclick="event.stopPropagation();unequipSlot('${s.id}')" style="font-size:10px;color:var(--text3);cursor:pointer;margin-top:2px">↩</span>`:`<div class="eq-slot-empty">Vide</div>`}
+    ${item?`<div class="eq-slot-item">${esc(item.name)}${isMagic?' ✨':''}</div><span onclick="event.stopPropagation();unequipSlot('${s.id}')" title="Retirer l'objet" style="font-size:10px;color:var(--text3);cursor:pointer;margin-top:2px">↩</span>`:`<div class="eq-slot-empty">Vide</div>`}
   </div>`;};
   const left=[{id:'head',label:'Tête',icon:'🪖'},{id:'shoulders',label:'Épaules',icon:'🧥'},{id:'chest',label:'Torse',icon:'🛡'},{id:'hands',label:'Mains',icon:'🧤'},{id:'legs',label:'Jambes',icon:'👖'}];
   const right=[{id:'neck',label:'Cou',icon:'📿'},{id:'ring1',label:'Anneau G',icon:'💍'},{id:'ring2',label:'Anneau D',icon:'💍'},{id:'waist',label:'Ceinture',icon:'🪢'},{id:'feet',label:'Pieds',icon:'👢'}];
