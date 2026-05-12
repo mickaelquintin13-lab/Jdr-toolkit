@@ -563,7 +563,13 @@ function openUserSettings(){
     </div>
     <div class="fl mb6">Pseudo</div>
     <input class="fi" id="settingsName" value="${esc(currentUserData.displayName)}" style="margin-bottom:16px">
-    <button class="btn bac" style="width:100%;margin-bottom:20px" onclick="saveUserSettings()">💾 Sauvegarder</button>
+    <button class="btn bac" style="width:100%;margin-bottom:16px" onclick="saveUserSettings()">💾 Sauvegarder</button>
+    <div class="pt" style="margin-bottom:10px">🔐 Compte</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn bsm" onclick="openChangeEmail()">✉️ Changer l'email</button>
+      <button class="btn bsm" onclick="openChangePassword()">🔑 Changer le mot de passe</button>
+      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="openDeleteAccount()">🗑 Supprimer le compte</button>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div class="pt" style="margin:0">📚 Mes personnages</div>
       <div style="display:flex;gap:6px">
@@ -583,6 +589,93 @@ function selectSettingsAvatar(av){
   document.querySelectorAll('#settingsAvatarPick .avatar-opt').forEach(el=>{
     el.className='avatar-opt'+(el.textContent===av?' on':'');
   });
+}
+
+function openChangeEmail(){
+  openModal(`<div class="pt">✉️ Changer l'email</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Email actuel : <strong style="color:var(--text2)">${esc(currentUser.email)}</strong></div>
+    <div class="fl mb6">Nouvel email</div>
+    <input class="fi" id="newEmail" type="email" placeholder="nouveau@email.com" style="margin-bottom:10px">
+    <div class="fl mb6">Mot de passe actuel (confirmation)</div>
+    <input class="fi" id="reAuthPwdEmail" type="password" placeholder="••••••••" style="margin-bottom:16px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="openUserSettings()">Annuler</button>
+      <button class="btn bac" style="flex:2" onclick="doChangeEmail()">✓ Confirmer</button>
+    </div>`);
+}
+async function doChangeEmail(){
+  const newEmail=document.getElementById('newEmail')?.value.trim();
+  const pwd=document.getElementById('reAuthPwdEmail')?.value;
+  if(!newEmail||!pwd){showToast('❌ Remplissez tous les champs.');return;}
+  try{
+    const cred=firebase.auth.EmailAuthProvider.credential(currentUser.email,pwd);
+    await currentUser.reauthenticateWithCredential(cred);
+    await currentUser.updateEmail(newEmail);
+    await fbDb.collection('users').doc(currentUser.uid).update({email:newEmail});
+    showToast('✅ Email mis à jour !');closeModal();
+  }catch(e){
+    const m={'auth/wrong-password':'Mot de passe incorrect.','auth/invalid-email':'Email invalide.','auth/email-already-in-use':'Email déjà utilisé.'};
+    showToast('❌ '+(m[e.code]||e.message));
+  }
+}
+
+function openChangePassword(){
+  openModal(`<div class="pt">🔑 Changer le mot de passe</div>
+    <div class="fl mb6">Mot de passe actuel</div>
+    <input class="fi" id="oldPwd" type="password" placeholder="••••••••" style="margin-bottom:10px">
+    <div class="fl mb6">Nouveau mot de passe (6 car. min.)</div>
+    <input class="fi" id="newPwd" type="password" placeholder="••••••••" style="margin-bottom:10px">
+    <div class="fl mb6">Confirmer le nouveau mot de passe</div>
+    <input class="fi" id="newPwd2" type="password" placeholder="••••••••" style="margin-bottom:16px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="openUserSettings()">Annuler</button>
+      <button class="btn bac" style="flex:2" onclick="doChangePassword()">✓ Confirmer</button>
+    </div>`);
+}
+async function doChangePassword(){
+  const oldPwd=document.getElementById('oldPwd')?.value;
+  const newPwd=document.getElementById('newPwd')?.value;
+  const newPwd2=document.getElementById('newPwd2')?.value;
+  if(!oldPwd||!newPwd||!newPwd2){showToast('❌ Remplissez tous les champs.');return;}
+  if(newPwd!==newPwd2){showToast('❌ Les mots de passe ne correspondent pas.');return;}
+  if(newPwd.length<6){showToast('❌ Mot de passe trop court (6 car. min.)');return;}
+  try{
+    const cred=firebase.auth.EmailAuthProvider.credential(currentUser.email,oldPwd);
+    await currentUser.reauthenticateWithCredential(cred);
+    await currentUser.updatePassword(newPwd);
+    showToast('✅ Mot de passe mis à jour !');closeModal();
+  }catch(e){
+    const m={'auth/wrong-password':'Mot de passe actuel incorrect.','auth/weak-password':'Nouveau mot de passe trop faible.'};
+    showToast('❌ '+(m[e.code]||e.message));
+  }
+}
+
+function openDeleteAccount(){
+  openModal(`<div class="pt" style="color:#e53935">⚠️ Supprimer le compte</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Cette action est <strong>irréversible</strong>. Toutes vos données seront supprimées définitivement.</p>
+    <div class="fl mb6">Mot de passe (confirmation)</div>
+    <input class="fi" id="deleteAccPwd" type="password" placeholder="••••••••" style="margin-bottom:10px">
+    <div class="fl mb6">Tapez <strong style="color:var(--cp)">SUPPRIMER</strong> pour confirmer</div>
+    <input class="fi" id="deleteAccConfirm" placeholder="SUPPRIMER" style="margin-bottom:16px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="openUserSettings()">Annuler</button>
+      <button class="btn bdanger" style="flex:2" onclick="doDeleteAccount()">🗑 Supprimer définitivement</button>
+    </div>`);
+}
+async function doDeleteAccount(){
+  const pwd=document.getElementById('deleteAccPwd')?.value;
+  const confirm=document.getElementById('deleteAccConfirm')?.value;
+  if(confirm!=='SUPPRIMER'){showToast('❌ Tapez exactement SUPPRIMER pour confirmer.');return;}
+  if(!pwd){showToast('❌ Mot de passe requis.');return;}
+  try{
+    const cred=firebase.auth.EmailAuthProvider.credential(currentUser.email,pwd);
+    await currentUser.reauthenticateWithCredential(cred);
+    await fbDb.collection('users').doc(currentUser.uid).delete();
+    await currentUser.delete();
+  }catch(e){
+    const m={'auth/wrong-password':'Mot de passe incorrect.'};
+    showToast('❌ '+(m[e.code]||e.message));
+  }
 }
 async function saveUserSettings(){
   const name=document.getElementById('settingsName').value.trim();
@@ -1963,9 +2056,7 @@ function render(){
 
 function renderPlayerBar(){
   const bar=document.getElementById('playerBar');if(!bar)return;
-  bar.innerHTML=state.players.map((pl,i)=>`<span class="ptag${i===state.activeIdx?' on':''}" onclick="switchPlayer(${i})">${esc(pl.charName||pl.name)}</span>`).join('')
-    +`<span class="ptag ptag-add" onclick="addPlayer()">+ Joueur</span>`
-    +(state.players.length>1?`<span class="ptag" onclick="deletePlayer()" style="border-color:#b71c1c;color:#b71c1c">🗑</span>`:'');
+  bar.innerHTML=state.players.map((pl,i)=>`<span class="ptag${i===state.activeIdx?' on':''}" onclick="switchPlayer(${i})">${esc(pl.charName||pl.name)}</span>`).join('');
 }
 
 function renderTabBar(){
