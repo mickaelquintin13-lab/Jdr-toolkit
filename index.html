@@ -388,10 +388,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 <!-- ÉCRAN MJ -->
 <div id="mjScreen" style="display:none">
   <div class="mj-hdr">
-    <span class="mj-hdr-title">🎲 Écran du MJ</span>
-    <span id="mjHdrCamp" style="font-size:12px;color:var(--text2);flex:1;margin-left:10px"></span>
-    <button class="btn bsm" onclick="showHub()" style="font-size:11px">⬅ Tables</button>
-    <button class="btn bsm" onclick="doLogout()" style="font-size:11px">Déconnexion</button>
+    <button class="btn bsm" onclick="showHub()" style="border-color:var(--cp);color:var(--cp);font-weight:600;flex-shrink:0" title="Retour aux tables">🏠 Tables</button>
+    <span class="mj-hdr-title" style="margin-left:8px;flex-shrink:0">🎲 MJ</span>
+    <span id="mjHdrCamp" style="font-size:12px;color:var(--text2);flex:1;margin:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+    <button class="hub-user-btn" onclick="openUserSettings()" title="Profil &amp; Déconnexion" style="flex-shrink:0">👤 Profil</button>
   </div>
   <div class="mj-tabs" id="mjTabBar"></div>
   <div id="mjTabContent"></div>
@@ -400,13 +400,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 <!-- APPLICATION PRINCIPALE -->
 <div id="app" style="display:none">
   <div class="hdr">
-    <span class="hdr-title">⚔ D&D 5e</span>
-    <span class="hdr-char" id="hdrChar">Fiche de personnage</span>
-    <span id="hdrUser" style="font-size:11px;color:var(--text3)"></span>
-    <button class="btn bsm" id="mjBtn" onclick="toggleMJ()" style="border-color:var(--cp);color:var(--cp)">🎲 MJ</button>
-    <button class="btn bac bsm" onclick="saveAll()">💾 Sauvegarder</button>
-    <button class="btn bsm" onclick="showHub()" style="font-size:11px">⬅ Tables</button>
-    <button class="btn bsm" onclick="doLogout()" style="font-size:11px">Déconnexion</button>
+    <button class="btn bsm" onclick="showHub()" style="border-color:var(--cp);color:var(--cp);font-weight:600;flex-shrink:0" title="Retour aux tables">🏠 Tables</button>
+    <span class="hdr-char" id="hdrChar" style="flex:1;text-align:center">Fiche de personnage</span>
+    <span id="hdrUser" style="display:none"></span>
+    <button class="btn bsm" id="mjBtn" onclick="toggleMJ()" style="border-color:var(--cp);color:var(--cp);flex-shrink:0">🎲 MJ</button>
+    <button class="btn bac bsm" onclick="saveAll()" style="flex-shrink:0" title="Sauvegarder">💾</button>
+    <button class="hub-user-btn" onclick="openUserSettings()" title="Profil &amp; Déconnexion" style="flex-shrink:0">👤 Profil</button>
   </div>
   <div class="pbar" id="playerBar"></div>
   <div class="tabs" id="tabBar"></div>
@@ -573,7 +572,8 @@ function openUserSettings(){
       </div>
     </div>
     <div>${charHtml}</div>
-    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:8px">
+      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="closeModal();doLogout()">🚪 Déconnexion</button>
       <button class="btn" onclick="closeModal()">Fermer</button>
     </div>`);
   window._settingsAvatar=av;
@@ -1445,11 +1445,13 @@ function clearSpellsCache(){
 // ═══════════════════════════════════════
 async function loadItemsDB(onDone){
   if(ITEMS_DB){if(onDone)onDone();return;}
+  try{const c=localStorage.getItem('dnd5e_items_db');if(c){ITEMS_DB=JSON.parse(c);showToast('📦 Objets chargés depuis le cache ('+ITEMS_DB.length+')');if(onDone)onDone();return;}}catch(e){}
   showToast('⏳ Chargement du compendium d\'objets...');
   try{
     const resp=await fetch('items_db.json');
     if(!resp.ok)throw new Error();
     ITEMS_DB=await resp.json();
+    try{localStorage.setItem('dnd5e_items_db',JSON.stringify(ITEMS_DB));}catch(e){}
     showToast('✅ '+ITEMS_DB.length+' objets chargés !');
     if(onDone)onDone();
   }catch(e){showToast('❌ Impossible de charger items_db.json — placez le fichier avec index.html');}
@@ -1460,11 +1462,13 @@ async function loadItemsDB(onDone){
 // ═══════════════════════════════════════
 async function loadMonstersDB(onDone){
   if(MONSTERS_DB){if(onDone)onDone();return;}
+  try{const c=localStorage.getItem('dnd5e_monsters_db');if(c){MONSTERS_DB=JSON.parse(c);showToast('👾 Monstres chargés depuis le cache ('+MONSTERS_DB.length+')');if(onDone)onDone();return;}}catch(e){}
   showToast('⏳ Chargement du compendium de monstres...');
   try{
     const resp=await fetch('monsters_db.json');
     if(!resp.ok)throw new Error();
     MONSTERS_DB=await resp.json();
+    try{localStorage.setItem('dnd5e_monsters_db',JSON.stringify(MONSTERS_DB));}catch(e){}
     showToast('✅ '+MONSTERS_DB.length+' monstres chargés !');
     if(onDone)onDone();
   }catch(e){showToast('❌ Impossible de charger monsters_db.json — placez le fichier avec index.html');}
@@ -1472,19 +1476,23 @@ async function loadMonstersDB(onDone){
 
 async function loadFeatsDB(){
   if(FEATS_DB)return;
-  try{const r=await fetch('feats_db.json');if(r.ok)FEATS_DB=await r.json();}catch(e){}
+  try{const c=localStorage.getItem('dnd5e_feats_db');if(c){FEATS_DB=JSON.parse(c);return;}}catch(e){}
+  try{const r=await fetch('feats_db.json');if(r.ok){FEATS_DB=await r.json();try{localStorage.setItem('dnd5e_feats_db',JSON.stringify(FEATS_DB));}catch(e){}}}catch(e){}
 }
 async function loadRacesDB(){
   if(RACES_DB)return;
-  try{const r=await fetch('races_db.json');if(r.ok)RACES_DB=await r.json();}catch(e){}
+  try{const c=localStorage.getItem('dnd5e_races_db');if(c){RACES_DB=JSON.parse(c);return;}}catch(e){}
+  try{const r=await fetch('races_db.json');if(r.ok){RACES_DB=await r.json();try{localStorage.setItem('dnd5e_races_db',JSON.stringify(RACES_DB));}catch(e){}}}catch(e){}
 }
 async function loadBackgroundsDB(){
   if(BACKGROUNDS_DB)return;
-  try{const r=await fetch('backgrounds_db.json');if(r.ok)BACKGROUNDS_DB=await r.json();}catch(e){}
+  try{const c=localStorage.getItem('dnd5e_backgrounds_db');if(c){BACKGROUNDS_DB=JSON.parse(c);return;}}catch(e){}
+  try{const r=await fetch('backgrounds_db.json');if(r.ok){BACKGROUNDS_DB=await r.json();try{localStorage.setItem('dnd5e_backgrounds_db',JSON.stringify(BACKGROUNDS_DB));}catch(e){}}}catch(e){}
 }
 async function loadClassesDB(){
   if(CLASSES_DB)return;
-  try{const r=await fetch('classes_db.json');if(r.ok)CLASSES_DB=await r.json();}catch(e){}
+  try{const c=localStorage.getItem('dnd5e_classes_db');if(c){CLASSES_DB=JSON.parse(c);return;}}catch(e){}
+  try{const r=await fetch('classes_db.json');if(r.ok){CLASSES_DB=await r.json();try{localStorage.setItem('dnd5e_classes_db',JSON.stringify(CLASSES_DB));}catch(e){}}}catch(e){}
 }
 
 function searchSpellsDB(query, filterClass, filterLevel, filterSchool){
@@ -1934,6 +1942,7 @@ let _equipProfOpen={w:true,a:true};
 
 async function uploadEquipPortrait(input){
   const file=input.files[0];if(!file)return;
+  if(file.size>614400){showToast('❌ Image trop lourde (max 600 Ko). Compressez-la avant import.');input.value='';return;}
   const reader=new FileReader();
   reader.onload=e=>{upd('equipPortrait',e.target.result);render();};
   reader.readAsDataURL(file);
@@ -1964,15 +1973,15 @@ function renderTabBar(){
   const p=P();
   if(!p.created){bar.innerHTML='';return;}
   const TABS=[
-    {id:'perso',label:'⚔ Personnage'},
-    {id:'competences',label:'✦ Compétences'},
-    {id:'combat',label:'🗡 Combat'},
-    {id:'sorts',label:'✦ Sorts'},
-    {id:'equipement',label:'🛡 Équipement'},
+    {id:'perso',label:'🧑 Perso'},
+    {id:'competences',label:'🎯 Compétences'},
+    {id:'combat',label:'⚔️ Combat'},
+    {id:'sorts',label:'✨ Sorts'},
+    {id:'equipement',label:'🛡️ Équip.'},
     {id:'sac',label:'🎒 Sac'},
-    {id:'historique',label:'📜 Historique'},
-    {id:'journal',label:'📓 Journal'},
-    {id:'xp',label:'✧ Expérience'},
+    {id:'historique',label:'📖 Historique'},
+    {id:'journal',label:'📝 Journal'},
+    {id:'xp',label:'⭐ XP'},
   ];
   if(p.pendingLevelUp)TABS.push({id:'levelup',label:'⬆ Niveau +',cls:'lvlup'});
   // Onglet actif = state.activeTab
@@ -4689,7 +4698,7 @@ function selectBgPerso(name){upd('background',name);const inp=document.getElemen
 // ═══════════════════════════════════════
 // UTILITAIRES
 // ═══════════════════════════════════════
-function uploadPortrait(input){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{upd('portrait',e.target.result);render();};reader.readAsDataURL(file);}
+function uploadPortrait(input){const file=input.files[0];if(!file)return;if(file.size>614400){showToast('❌ Image trop lourde (max 600 Ko). Compressez-la avant import.');input.value='';return;}const reader=new FileReader();reader.onload=e=>{upd('portrait',e.target.result);render();};reader.readAsDataURL(file);}
 function openModal(html){const m=document.getElementById('modal');m.className='open';m.innerHTML=`<div class="modal-box" style="max-width:480px">${html}</div>`;}
 function openWideModal(html){const m=document.getElementById('modal');m.className='open';m.innerHTML=`<div class="modal-box" style="max-width:600px">${html}</div>`;}
 function closeModal(){const m=document.getElementById('modal');if(m){m.className='';m.innerHTML='';}}
