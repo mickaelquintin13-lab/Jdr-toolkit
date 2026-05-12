@@ -385,8 +385,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;justify-content:flex-end">
       <div id="hubMJBadge" style="display:none;align-items:center;gap:5px;padding:3px 10px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;font-size:11px;color:var(--cp);font-family:var(--F);letter-spacing:.06em">🎲 Maître de Jeu</div>
       <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">⚔ Profil</button>
+      <button class="btn bsm" onclick="doLogout()" title="Déconnexion" style="color:#e53935;border-color:rgba(229,57,53,.3);padding:3px 8px;margin-left:20px;flex-shrink:0">🚪</button>
     </div>
-    <button class="btn bsm" onclick="doLogout()" title="Déconnexion" style="color:#e53935;border-color:rgba(229,57,53,.3);padding:3px 8px;margin-left:16px;flex-shrink:0">🚪</button>
   </div>
   <div class="hub-body">
     <div id="hubContent"><div class="hub-empty"><span class="auth-spinner"></span> Chargement...</div></div>
@@ -452,6 +452,8 @@ let _compilationData=null;
 let _mjTab='joueurs';
 let _mjPlayersData=[];
 let _mjCustomFeats=[];
+let _mjCompLib={};
+let _mjActiveCompId=null;
 let _mjCombatants=[];
 let _mjCombatStarted=false;
 let _mjCurrentTurn=0;
@@ -564,6 +566,20 @@ function openUserSettings(){
       <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-left:4px;flex-shrink:0" onclick="event.stopPropagation();deleteCharFromLib('${campId}')" title="Supprimer ce personnage">🗑</button>
     </div>`;}).join('')
     :`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:6px 0">Aucun personnage sauvegardé.</div>`;
+  // Section compendiums
+  const compIds=Object.keys(_mjCompLib);
+  const compHtml=compIds.length?compIds.map(id=>{
+    const c=_mjCompLib[id];
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(c.name)}</div>
+        <div style="font-size:11px;color:var(--text3)">${(c.feats||[]).length} capacité(s) · ${(c.spells||[]).length} sort(s) · ${(c.items||[]).length} objet(s)</div>
+      </div>
+      <button class="btn bsm" onclick="closeModal();mjOpenCompendiumEditor('${id}')" title="Éditer">✏️</button>
+      <button class="btn bsm" onclick="exportMJCompendium('${id}')" title="Exporter">📤</button>
+      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="mjDeleteComp('${id}')" title="Supprimer">🗑</button>
+    </div>`;}).join('')
+    :`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:6px 0">Aucun compendium personnalisé.</div>`;
   openModal(`<div class="pt" style="margin-bottom:12px">⚙ Paramètres du profil</div>
     <details class="acc" open>
       <summary>🧑 Profil</summary>
@@ -585,6 +601,16 @@ function openUserSettings(){
           <button class="btn bsm bprimary" onclick="openCreateStandaloneChar()">+ Créer</button>
         </div>
         <div>${charHtml}</div>
+      </div>
+    </details>
+    <details class="acc">
+      <summary>🧰 Mes compendiums</summary>
+      <div class="acc-body">
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <button class="btn bsm bprimary" onclick="closeModal();mjCreateNewComp()">+ Nouveau</button>
+          <button class="btn bsm" onclick="closeModal();importMJCompendium()">📥 Importer</button>
+        </div>
+        <div>${compHtml}</div>
       </div>
     </details>
     <details class="acc">
@@ -1004,17 +1030,47 @@ function renderHubHTML(tables){
 
 // ─── CRÉER UNE TABLE (MJ) ───
 function openCreateTable(){
+  const STD_COMP=[
+    {id:'spells',label:'📖 Sorts SRD'},
+    {id:'items',label:'⚔️ Objets SRD'},
+    {id:'monsters',label:'👾 Monstres SRD'},
+    {id:'feats',label:'🌟 Dons SRD'},
+    {id:'races',label:'🧝 Races SRD'},
+    {id:'backgrounds',label:'📜 Historiques SRD'},
+    {id:'classes',label:'🛡 Classes SRD'},
+  ];
+  const compIds=Object.keys(_mjCompLib);
+  const stdHtml=STD_COMP.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px">
+    <input type="checkbox" id="std_${s.id}" checked style="accent-color:var(--cp)"> ${s.label}
+  </label>`).join('');
+  const custHtml=compIds.length?compIds.map(id=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px">
+    <input type="checkbox" id="cust_${id}" checked style="accent-color:var(--cp)"> 🧰 ${esc(_mjCompLib[id].name)}
+  </label>`).join('')
+    :`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucun compendium perso — créez-en un dans votre profil.</div>`;
   openModal(`<div class="pt">🎲 Nouvelle table</div>
     <div class="fl mb6">Nom de la table</div>
-    <input class="fi" id="newTableName" placeholder="Ex: Table du vendredi" style="margin-bottom:16px">
+    <input class="fi" id="newTableName" placeholder="Ex: Table du vendredi" style="margin-bottom:14px">
+    <details class="acc" style="margin-bottom:12px">
+      <summary>🧰 Compendiums disponibles</summary>
+      <div class="acc-body">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Choisissez les compendiums actifs pour cette table.</div>
+        <div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Standard (SRD)</div>
+        ${stdHtml}
+        ${compIds.length?`<div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin:10px 0 4px">Personnalisés</div>${custHtml}`:''}
+      </div>
+    </details>
     <div style="display:flex;gap:8px">
       <button class="btn" style="flex:1" onclick="closeModal()">Annuler</button>
       <button class="btn bac" style="flex:2" onclick="confirmCreateTable()">✓ Créer</button>
     </div>`);
+  setTimeout(()=>{const i=document.getElementById('newTableName');if(i)i.focus();},50);
 }
 async function confirmCreateTable(){
   const name=document.getElementById('newTableName').value.trim();
   if(!name){showToast('❌ Donnez un nom à la table.');return;}
+  const STD_IDS=['spells','items','monsters','feats','races','backgrounds','classes'];
+  const activeStd=STD_IDS.filter(id=>document.getElementById('std_'+id)?.checked!==false);
+  const activeCustom=Object.keys(_mjCompLib).filter(id=>document.getElementById('cust_'+id)?.checked!==false);
   const inviteCode=genCode();
   try{
     await fbDb.collection('tables').add({
@@ -1022,6 +1078,8 @@ async function confirmCreateTable(){
       inviteCode,memberIds:[currentUser.uid],
       memberNames:{[currentUser.uid]:currentUserData.displayName},
       memberAvatars:{[currentUser.uid]:currentUserData.avatar||'🎲'},
+      activeStdCompendiums:activeStd,
+      activeCustomCompendiums:activeCustom,
       createdAt:firebase.firestore.FieldValue.serverTimestamp()
     });
     closeModal();showToast('✅ Table "'+name+'" créée !');renderHub();
@@ -1310,7 +1368,12 @@ async function enterCampaign(tableId,campaignId,tName,cName,preloadedCharData){
       }catch(e){}
       showMJScreen();
       await loadMJPlayersData();
-      loadMJCustomFeats();
+      // Charge la bibliothèque de compendiums puis filtre selon les compendiums actifs de la table
+      if(!Object.keys(_mjCompLib).length)await loadMJCompLib();
+      const activeCustomIds=tableData?.activeCustomCompendiums||Object.keys(_mjCompLib);
+      _mjActiveCompId=activeCustomIds.find(id=>_mjCompLib[id])||Object.keys(_mjCompLib)[0]||null;
+      _mjCustomFeats=_mjActiveCompId?(_mjCompLib[_mjActiveCompId].feats||[]):[];
+      _refreshMjPool();
       renderMJContent();
       // Chargement silencieux des petits compendiums en arrière-plan
       loadFeatsDB();loadRacesDB();loadBackgroundsDB();loadClassesDB();
@@ -1351,6 +1414,7 @@ fbAuth.onAuthStateChanged(async user=>{
       currentUserData=doc.exists?doc.data():{displayName:user.displayName||'Utilisateur',role:'Joueur'};
     }catch(e){currentUserData={displayName:user.displayName||'Utilisateur',role:'Joueur'};}
     showHub();
+    loadMJCompLib();
   }else{
     currentUser=null;currentUserData=null;
     showAuthScreen();
@@ -4839,7 +4903,13 @@ async function loadMJPool(){
   }catch(e){}
 }
 async function saveMJPool(){
-  try{await window.storage.set('dnd5e_mj_pool',JSON.stringify(mjPool),true);}catch(e){}
+  if(_mjActiveCompId&&_mjCompLib[_mjActiveCompId]){
+    _mjCompLib[_mjActiveCompId].spells=mjPool.customSpells||[];
+    _mjCompLib[_mjActiveCompId].items=mjPool.customItems||[];
+    await saveMJCompLib();
+  }else{
+    try{await window.storage.set('dnd5e_mj_pool',JSON.stringify(mjPool),true);}catch(e){}
+  }
 }
 
 // ═══ MODE MJ ═══
@@ -5492,14 +5562,59 @@ function mjEditRemoveFeat(i){
 }
 
 // ── Compendium personnalisé ──
-async function loadMJCustomFeats(){
+// ═══ BIBLIOTHÈQUE COMPENDIUMS ═══
+function _genCompId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+
+async function loadMJCompLib(){
   if(!currentUser)return;
-  try{const doc=await fbDb.collection('users').doc(currentUser.uid).get();_mjCustomFeats=(doc.exists&&doc.data().customFeats)||[];}catch(e){_mjCustomFeats=[];}
+  try{
+    const doc=await fbDb.collection('users').doc(currentUser.uid).get();
+    const data=doc.exists?doc.data():{};
+    _mjCompLib=data.compendiumLib||{};
+    if(!Object.keys(_mjCompLib).length){
+      // Migration depuis l'ancien système
+      const oldFeats=data.customFeats||[];
+      let oldSpells=[],oldItems=[];
+      try{const r=await window.storage.get('dnd5e_mj_pool',true);if(r&&r.value){const p=JSON.parse(r.value);oldSpells=p.customSpells||[];oldItems=p.customItems||[];}}catch(e){}
+      if(oldFeats.length||oldSpells.length||oldItems.length){
+        const id=_genCompId();
+        _mjCompLib[id]={name:'Mon compendium',createdAt:new Date().toISOString(),feats:oldFeats,spells:oldSpells,items:oldItems};
+        await fbDb.collection('users').doc(currentUser.uid).update({compendiumLib:_mjCompLib}).catch(()=>{});
+      }
+    }
+  }catch(e){_mjCompLib={};}
+  _refreshMjPool();
 }
+
+function _refreshMjPool(){
+  mjPool.customSpells=Object.values(_mjCompLib).flatMap(c=>c.spells||[]);
+  mjPool.customItems=Object.values(_mjCompLib).flatMap(c=>c.items||[]);
+}
+
+function _mjAllFeats(){
+  return Object.values(_mjCompLib).flatMap(c=>c.feats||[]);
+}
+
+function _ensureActiveComp(){
+  const ids=Object.keys(_mjCompLib);
+  if(_mjActiveCompId&&_mjCompLib[_mjActiveCompId])return;
+  if(ids.length>0){_mjActiveCompId=ids[0];}
+  else{const id=_genCompId();_mjCompLib[id]={name:'Mon compendium',createdAt:new Date().toISOString(),feats:[],spells:[],items:[]};_mjActiveCompId=id;}
+}
+
+async function saveMJCompLib(){
+  if(!currentUser)return;
+  try{await fbDb.collection('users').doc(currentUser.uid).update({compendiumLib:_mjCompLib});}
+  catch(e){showToast('❌ Erreur sauvegarde compendiums.');}
+}
+
+async function loadMJCustomFeats(){return loadMJCompLib();}
+
 async function saveMJCustomFeats(){
   if(!currentUser)return;
-  try{await fbDb.collection('users').doc(currentUser.uid).update({customFeats:_mjCustomFeats});}
-  catch(e){showToast('❌ Erreur sauvegarde compendium.');}
+  _ensureActiveComp();
+  _mjCompLib[_mjActiveCompId].feats=_mjCustomFeats;
+  await saveMJCompLib();
 }
 function _mjRenderCompendiumList(){
   if(!_mjCustomFeats.length)return'<div style="font-size:12px;color:var(--text3);font-style:italic;text-align:center;padding:20px">Aucune entrée. Créez votre première capacité ci-dessus.</div>';
@@ -5515,18 +5630,93 @@ function _mjRenderCompendiumList(){
   </div>`).join('');
 }
 function mjOpenCompendium(){
-  openWideModal(`<div class="pt">📚 Compendium personnalisé</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Créez et sauvegardez vos capacités, dons et traits maison. Ils seront disponibles pour tous vos personnages.</div>
+  const ids=Object.keys(_mjCompLib);
+  if(ids.length===1){mjOpenCompendiumEditor(ids[0]);return;}
+  // Bibliothèque : liste des compendiums
+  const listHtml=ids.length?ids.map(id=>{
+    const c=_mjCompLib[id];
+    const total=(c.feats||[]).length+(c.spells||[]).length+(c.items||[]).length;
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(c.name)}</div>
+        <div style="font-size:11px;color:var(--text3)">${(c.feats||[]).length} capacité(s) · ${(c.spells||[]).length} sort(s) · ${(c.items||[]).length} objet(s)</div>
+      </div>
+      <button class="btn bsm bprimary" onclick="mjOpenCompendiumEditor('${id}')">✏️ Éditer</button>
+      <button class="btn bsm" onclick="exportMJCompendium('${id}')">📤</button>
+    </div>`;}).join('')
+    :`<div style="font-size:12px;color:var(--text3);font-style:italic;text-align:center;padding:20px">Aucun compendium. Créez-en un ci-dessous.</div>`;
+  openWideModal(`<div class="pt">📚 Bibliothèque de compendiums</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Choisissez un compendium à éditer, ou créez-en un nouveau.</div>
+    <div style="max-height:50vh;overflow-y:auto;margin-bottom:12px">${listHtml}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px">
+        <button class="btn bsm bprimary" onclick="mjCreateNewComp()">+ Nouveau</button>
+        <button class="btn bsm" onclick="importMJCompendium()">📥 Importer</button>
+      </div>
+      <button class="btn bsm" onclick="closeModal()">Fermer</button>
+    </div>`);
+}
+
+function mjOpenCompendiumEditor(id){
+  if(!_mjCompLib[id])return;
+  _mjActiveCompId=id;
+  const c=_mjCompLib[id];
+  _mjCustomFeats=c.feats||[];
+  const hasLib=Object.keys(_mjCompLib).length>1;
+  openWideModal(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    ${hasLib?`<button class="btn bsm" onclick="mjOpenCompendium()" style="flex-shrink:0">← Retour</button>`:''}
+    <div class="pt" style="margin:0;flex:1">📚 ${esc(c.name)}</div>
+  </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Capacités, dons et traits maison disponibles pour vos tables.</div>
     <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px">
-      <div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">+ Nouvelle entrée</div>
+      <div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">+ Nouvelle capacité</div>
       <input id="mj_comp_name" class="fi" placeholder="Nom *" style="margin-bottom:6px;font-size:13px;font-weight:600">
       <input id="mj_comp_cat" class="fi" placeholder="Catégorie (ex : Racial, Magie, Roublard...)" style="margin-bottom:6px;font-size:12px">
       <textarea id="mj_comp_desc" class="fi" rows="3" placeholder="Description de la capacité..." style="font-size:12px;resize:vertical;margin-bottom:8px"></textarea>
-      <button class="btn bsm bprimary" onclick="mjCreateCustomFeat()">💾 Ajouter au compendium</button>
+      <button class="btn bsm bprimary" onclick="mjCreateCustomFeat()">💾 Ajouter</button>
     </div>
-    <div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${_mjCustomFeats.length} entrée(s)</div>
-    <div id="mj_comp_list" style="max-height:40vh;overflow-y:auto">${_mjRenderCompendiumList()}</div>
-    <div style="text-align:right;margin-top:12px"><button class="btn bsm" onclick="closeModal()">Fermer</button></div>`);
+    <div style="font-size:10px;color:var(--cp);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${_mjCustomFeats.length} capacité(s)</div>
+    <div id="mj_comp_list" style="max-height:38vh;overflow-y:auto">${_mjRenderCompendiumList()}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px">
+        <button class="btn bsm" onclick="exportMJCompendium('${id}')">📤 Exporter</button>
+        <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="mjDeleteComp('${id}')">🗑 Supprimer</button>
+      </div>
+      <button class="btn bsm" onclick="closeModal()">Fermer</button>
+    </div>`);
+}
+
+function mjCreateNewComp(){
+  openModal(`<div class="pt">📚 Nouveau compendium</div>
+    <div class="fl mb6">Nom du compendium</div>
+    <input class="fi" id="newCompName" placeholder="ex : Magie du Nord, Campagne Ravenloft..." style="margin-bottom:16px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="mjOpenCompendium()">Annuler</button>
+      <button class="btn bac" style="flex:2" onclick="mjConfirmCreateComp()">✓ Créer</button>
+    </div>`);
+  setTimeout(()=>{const i=document.getElementById('newCompName');if(i)i.focus();},50);
+}
+
+async function mjConfirmCreateComp(){
+  const name=(document.getElementById('newCompName')?.value||'').trim();
+  if(!name){showToast('❌ Donnez un nom au compendium.');return;}
+  const id=_genCompId();
+  _mjCompLib[id]={name,createdAt:new Date().toISOString(),feats:[],spells:[],items:[]};
+  await saveMJCompLib();
+  showToast('✅ Compendium "'+name+'" créé !');
+  mjOpenCompendiumEditor(id);
+}
+
+async function mjDeleteComp(id){
+  if(!_mjCompLib[id])return;
+  const name=_mjCompLib[id].name;
+  if(!confirm('Supprimer le compendium "'+name+'" ? Cette action est irréversible.'))return;
+  delete _mjCompLib[id];
+  if(_mjActiveCompId===id)_mjActiveCompId=null;
+  await saveMJCompLib();
+  _refreshMjPool();
+  showToast('🗑 Compendium supprimé.');
+  mjOpenCompendium();
 }
 async function mjCreateCustomFeat(){
   const name=(document.getElementById('mj_comp_name')?.value||'').trim();
@@ -5547,6 +5737,104 @@ async function mjDeleteCustomFeat(i){
   await saveMJCustomFeats();
   const list=document.getElementById('mj_comp_list');
   if(list)list.innerHTML=_mjRenderCompendiumList();
+}
+
+function exportMJCompendium(id){
+  const compId=id||_mjActiveCompId;
+  const c=compId?_mjCompLib[compId]:null;
+  if(!c){showToast('⚠️ Sélectionnez un compendium à exporter.');return;}
+  const feats=c.feats||[];const spells=c.spells||[];const items=c.items||[];
+  const total=feats.length+spells.length+items.length;
+  if(!total){showToast('⚠️ Compendium vide, rien à exporter.');return;}
+  window._exportCompId=compId;
+  openModal(`<div class="pt">📤 Exporter « ${esc(c.name)} »</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">${feats.length} capacité(s) · ${spells.length} sort(s) · ${items.length} objet(s)</div>
+    <div class="fl mb6">Nom du fichier</div>
+    <input class="fi" id="compExportName" style="margin-bottom:16px" value="${esc(c.name)}">
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="closeModal()">Annuler</button>
+      <button class="btn bac" style="flex:2" onclick="_doExportMJCompendium()">📤 Télécharger</button>
+    </div>`);
+  setTimeout(()=>{const i=document.getElementById('compExportName');if(i){i.focus();i.select();}},50);
+}
+
+function _doExportMJCompendium(){
+  const compId=window._exportCompId||_mjActiveCompId;
+  const c=compId?_mjCompLib[compId]:null;
+  if(!c){closeModal();return;}
+  const name=(document.getElementById('compExportName')?.value||c.name).trim();
+  const data={version:2,tool:'La Boîte à Outils',name,exportDate:new Date().toISOString(),
+    customFeats:c.feats||[],customSpells:c.spells||[],customItems:c.items||[]};
+  const total=data.customFeats.length+data.customSpells.length+data.customItems.length;
+  const filename=name.toLowerCase().replace(/[^a-z0-9À-ÿ]+/gi,'_')+'_compendium.json';
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  URL.revokeObjectURL(url);
+  closeModal();
+  showToast(`📤 "${name}" exporté (${total} entrée${total>1?'s':''}) !`);
+}
+
+function importMJCompendium(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.json,application/json';
+  input.onchange=async e=>{
+    const file=e.target.files[0];if(!file)return;
+    try{
+      const text=await file.text();
+      const data=JSON.parse(text);
+      const feats=data.customFeats||[];
+      const spells=data.customSpells||[];
+      const items=data.customItems||[];
+      const total=feats.length+spells.length+items.length;
+      if(!total){showToast('❌ Fichier vide ou invalide.');return;}
+      const importedName=data.name||'Compendium importé';
+      window._pendingCompendiumImport={name:importedName,feats,spells,items};
+      const existingIds=Object.keys(_mjCompLib);
+      const mergeOpts=existingIds.map(id=>`<option value="${id}">${esc(_mjCompLib[id].name)}</option>`).join('');
+      openModal(`<div class="pt">📥 Importer un compendium</div>
+        <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:var(--text2)">
+          <div style="font-size:14px;font-weight:600;color:var(--cp);margin-bottom:6px">« ${esc(importedName)} »</div>
+          <span style="color:var(--cp)">${feats.length}</span> capacité(s) &nbsp;·&nbsp;
+          <span style="color:var(--cp)">${spells.length}</span> sort(s) &nbsp;·&nbsp;
+          <span style="color:var(--cp)">${items.length}</span> objet(s)
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+          <button class="btn bac" onclick="confirmImportMJCompendium('new')">✨ Créer un nouveau compendium</button>
+          ${existingIds.length?`<div style="display:flex;gap:6px;align-items:center">
+            <select class="fi" id="mergeTargetId" style="flex:1">${mergeOpts}</select>
+            <button class="btn" onclick="confirmImportMJCompendium('merge')">➕ Fusionner</button>
+          </div>`:''}
+        </div>
+        <div style="text-align:right"><button class="btn bsm" onclick="closeModal()">Annuler</button></div>`);
+    }catch(err){showToast('❌ Fichier JSON invalide.');}
+  };
+  input.click();
+}
+
+async function confirmImportMJCompendium(mode){
+  const data=window._pendingCompendiumImport;
+  if(!data){closeModal();return;}
+  if(mode==='new'){
+    const id=_genCompId();
+    _mjCompLib[id]={name:data.name,createdAt:new Date().toISOString(),feats:data.feats,spells:data.spells,items:data.items};
+    _mjActiveCompId=id;
+  }else{
+    const targetId=document.getElementById('mergeTargetId')?.value||Object.keys(_mjCompLib)[0];
+    if(!targetId||!_mjCompLib[targetId]){showToast('❌ Compendium cible introuvable.');return;}
+    const c=_mjCompLib[targetId];
+    c.feats=[...c.feats,...data.feats];
+    c.spells=[...c.spells,...data.spells];
+    c.items=[...c.items,...data.items];
+    _mjActiveCompId=targetId;
+  }
+  await saveMJCompLib();
+  _refreshMjPool();
+  window._pendingCompendiumImport=null;
+  const total=data.feats.length+data.spells.length+data.items.length;
+  showToast(`✅ ${total} entrée${total>1?'s':''} importée${total>1?'s':''} !`);
+  closeModal();
+  mjOpenCompendiumEditor(_mjActiveCompId);
 }
 function _mjSnapshotEditData(){
   if(!_mjEditData)return;
@@ -5572,11 +5860,12 @@ function _mjSnapshotEditData(){
 }
 function mjOpenFeatPicker(playerIdx){
   _mjSnapshotEditData();
-  if(!_mjCustomFeats.length){showToast('Compendium vide — créez des capacités d\'abord via le bouton 📚 Compendium.');return;}
+  const allFeats=_mjAllFeats();
+  if(!allFeats.length){showToast('Compendium vide — créez des capacités d\'abord via le bouton 📚 Compendium.');return;}
   openWideModal(`<div class="pt">📚 Importer depuis le compendium</div>
     <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Cliquez sur une capacité pour l'ajouter à la fiche du personnage.</div>
     <div style="max-height:60vh;overflow-y:auto;margin-bottom:10px">
-      ${_mjCustomFeats.map((f,i)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cp)'" onmouseout="this.style.borderColor='var(--border)'" onclick="mjApplyCustomFeat(${i},${playerIdx})">
+      ${allFeats.map((f,i)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cp)'" onmouseout="this.style.borderColor='var(--border)'" onclick="mjApplyCustomFeat(${i},${playerIdx})">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600">${esc(f.name)}</div>
@@ -5590,7 +5879,7 @@ function mjOpenFeatPicker(playerIdx){
     <div style="text-align:right"><button class="btn bsm" onclick="mjEditPlayerSheet(${playerIdx})">← Retour à la fiche</button></div>`);
 }
 function mjApplyCustomFeat(featIdx,playerIdx){
-  const f=_mjCustomFeats[featIdx];if(!f||!_mjEditData)return;
+  const f=_mjAllFeats()[featIdx];if(!f||!_mjEditData)return;
   _mjEditData.p.features=_mjEditData.p.features||[];
   _mjEditData.p.features.push({name:f.name,classe:f.category||'',desc:f.description||''});
   mjEditPlayerSheet(playerIdx);
