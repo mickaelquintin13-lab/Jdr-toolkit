@@ -658,6 +658,7 @@ function showHub(){
   stopAllListeners();
   _groupData=[];
   const hud=document.getElementById('partyHud');if(hud)hud.style.display='none';
+  const mjBadge=document.getElementById('hubMJBadge');if(mjBadge)mjBadge.style.display='none';
   document.getElementById('authScreen').style.display='none';
   document.getElementById('hubScreen').style.display='block';
   document.getElementById('app').style.display='none';
@@ -1108,7 +1109,7 @@ async function renderHub(){
     }
     _hubCache=tablesWithCamps;
     const mjBadge=document.getElementById('hubMJBadge');
-    if(mjBadge) mjBadge.style.display=tablesWithCamps.some(t=>t.mjId===currentUser.uid)?'flex':'none';
+    if(mjBadge) mjBadge.style.display='none';
     hub.innerHTML=renderHubHTML(tablesWithCamps);
     const params=new URLSearchParams(window.location.search);
     const joinCode=params.get('join');
