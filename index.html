@@ -180,10 +180,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .tavern-bg{
   position:relative;
   background:
-    radial-gradient(ellipse at 15% 80%, rgba(180,90,10,.35) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 15%, rgba(210,130,20,.25) 0%, transparent 45%),
-    radial-gradient(ellipse at 55% 55%, rgba(120,55,5,.3) 0%, transparent 65%),
-    linear-gradient(155deg, #090604 0%, #17100a 35%, #0c0905 65%, #19110a 100%);
+    radial-gradient(ellipse at 15% 80%, rgba(180,90,10,.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 15%, rgba(210,130,20,.15) 0%, transparent 45%),
+    linear-gradient(rgba(6,4,2,.62), rgba(6,4,2,.62)),
+    url('bg-login.jpg') center/cover fixed;
 }
 .tavern-bg::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -271,6 +271,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .mj-log{max-height:160px;overflow-y:auto;padding:8px;background:rgba(0,0,0,.3);border-radius:6px;font-size:11px;color:var(--text3)}
 .mj-log-entry{padding:2px 0;border-bottom:1px solid rgba(46,50,64,.3);line-height:1.5}
 .bprimary{background:rgba(200,168,75,.15)!important;border-color:var(--cp)!important;color:var(--cp)!important}
+/* ACCORDION */
+.acc{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden}
+.acc summary{list-style:none;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;font-family:var(--F);font-size:12px;color:var(--cp);letter-spacing:.06em;background:var(--surface2);user-select:none}
+.acc summary::-webkit-details-marker{display:none}
+.acc summary::after{content:'▾';font-size:11px;color:var(--text3);transition:transform .2s}
+.acc[open] summary::after{transform:rotate(-180deg)}
+.acc summary:hover{background:var(--surface3)}
+.acc-body{padding:12px}
 /* ===== RESPONSIVE MOBILE ===== */
 @media(max-width:640px){
   /* Espacement global */
@@ -556,29 +564,41 @@ function openUserSettings(){
       <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-left:4px;flex-shrink:0" onclick="event.stopPropagation();deleteCharFromLib('${campId}')">🗑</button>
     </div>`;}).join('')
     :`<div style="font-size:12px;color:var(--text3);font-style:italic;padding:6px 0">Aucun personnage sauvegardé.</div>`;
-  openModal(`<div class="pt">⚙ Paramètres du profil</div>
-    <div class="fl mb6">Icône</div>
-    <div class="avatar-pick" id="settingsAvatarPick">
-      ${avatars.map(a=>`<span class="avatar-opt${a===av?' on':''}" onclick="selectSettingsAvatar('${a}')">${a}</span>`).join('')}
-    </div>
-    <div class="fl mb6">Pseudo</div>
-    <input class="fi" id="settingsName" value="${esc(currentUserData.displayName)}" style="margin-bottom:16px">
-    <button class="btn bac" style="width:100%;margin-bottom:16px" onclick="saveUserSettings()">💾 Sauvegarder</button>
-    <div class="pt" style="margin-bottom:10px">🔐 Compte</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px">
-      <button class="btn bsm" onclick="openChangeEmail()">✉️ Changer l'email</button>
-      <button class="btn bsm" onclick="openChangePassword()">🔑 Changer le mot de passe</button>
-      <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="openDeleteAccount()">🗑 Supprimer le compte</button>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div class="pt" style="margin:0">📚 Mes personnages</div>
-      <div style="display:flex;gap:6px">
-        <button class="btn bsm" onclick="importStandaloneChar()">📥 Importer JSON</button>
-        <button class="btn bsm bprimary" onclick="openCreateStandaloneChar()">+ Créer</button>
+  openModal(`<div class="pt" style="margin-bottom:12px">⚙ Paramètres du profil</div>
+    <details class="acc" open>
+      <summary>🧑 Profil</summary>
+      <div class="acc-body">
+        <div class="fl mb6">Icône</div>
+        <div class="avatar-pick" id="settingsAvatarPick">
+          ${avatars.map(a=>`<span class="avatar-opt${a===av?' on':''}" onclick="selectSettingsAvatar('${a}')">${a}</span>`).join('')}
+        </div>
+        <div class="fl mb6">Pseudo</div>
+        <input class="fi" id="settingsName" value="${esc(currentUserData.displayName)}" style="margin-bottom:12px">
+        <button class="btn bac" style="width:100%" onclick="saveUserSettings()">💾 Sauvegarder</button>
       </div>
-    </div>
-    <div>${charHtml}</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:8px">
+    </details>
+    <details class="acc" open>
+      <summary>📚 Mes personnages</summary>
+      <div class="acc-body">
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <button class="btn bsm" onclick="importStandaloneChar()">📥 Importer JSON</button>
+          <button class="btn bsm bprimary" onclick="openCreateStandaloneChar()">+ Créer</button>
+        </div>
+        <div>${charHtml}</div>
+      </div>
+    </details>
+    <details class="acc">
+      <summary>🔐 Compte</summary>
+      <div class="acc-body">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Email : <strong style="color:var(--text2)">${esc(currentUser.email)}</strong></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn bsm" onclick="openChangeEmail()">✉️ Changer l'email</button>
+          <button class="btn bsm" onclick="openChangePassword()">🔑 Changer le mot de passe</button>
+          <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3);margin-top:4px" onclick="openDeleteAccount()">🗑 Supprimer le compte</button>
+        </div>
+      </div>
+    </details>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px">
       <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="closeModal();doLogout()">🚪 Déconnexion</button>
       <button class="btn" onclick="closeModal()">Fermer</button>
     </div>`);
