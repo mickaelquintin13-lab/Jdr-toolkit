@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#0d0d0f"/>
+  <rect x="6" y="6" width="500" height="500" rx="74" fill="none" stroke="#c8a84b" stroke-width="10"/>
+  <!-- Coffre/boîte -->
+  <rect x="96" y="220" width="320" height="200" rx="18" fill="#1e2128" stroke="#c8a84b" stroke-width="12"/>
+  <!-- Couvercle -->
+  <rect x="96" y="156" width="320" height="80" rx="18" fill="#16181d" stroke="#c8a84b" stroke-width="12"/>
+  <!-- Charnière centrale -->
+  <rect x="210" y="232" width="92" height="44" rx="8" fill="none" stroke="#c8a84b" stroke-width="10"/>
+  <circle cx="256" cy="254" r="10" fill="#c8a84b"/>
+  <!-- Poignée -->
+  <path d="M180 156 L180 120 Q256 88 332 120 L332 156" fill="none" stroke="#c8a84b" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Décorations coins -->
+  <rect x="96" y="220" width="36" height="200" rx="4" fill="rgba(200,168,75,0.08)"/>
+  <rect x="380" y="220" width="36" height="200" rx="4" fill="rgba(200,168,75,0.08)"/>
+</svg>
