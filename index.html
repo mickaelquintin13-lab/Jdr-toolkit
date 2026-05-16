@@ -459,14 +459,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
   <div class="pbar" id="playerBar"></div>
   <div class="tabs" id="tabBar"></div>
   <div id="tabContent"></div>
-  <!-- HUD GROUPE -->
-  <div id="partyHud">
-    <div id="partyHudPanel" class="phud-panel" style="display:none"></div>
-    <div id="partyHudBtn" onclick="_togglePartyHud()" title="Groupe">
-      👥
-      <div id="partyHudBadge"></div>
-    </div>
-  </div>
 </div>
 <div id="modal"></div>
 <script>
@@ -499,6 +491,7 @@ let _expandedCamp=null;
 let _unsubscribes=[];
 let _mjRenderDebounce=null;
 let _unsaved=false;
+let _autoSaveTimer=null;
 let _userInfoCache={};
 function stopAllListeners(){_unsubscribes.forEach(fn=>{try{fn();}catch(e){}});_unsubscribes=[];}
 window.addEventListener('beforeunload',e=>{if(_unsaved){e.preventDefault();e.returnValue='Des modifications ne sont pas sauvegardées. Quitter quand même ?';}});
@@ -629,6 +622,112 @@ function _togglePartyHud(){
   const panel=document.getElementById('partyHudPanel');
   if(panel)panel.style.display=_groupHudOpen?'block':'none';
 }
+function _partyMemberClick(uid){
+  if(uid===currentUser?.uid){
+    // Son propre perso → fiche
+    _groupHudOpen=false;
+    const panel=document.getElementById('partyHudPanel');
+    if(panel)panel.style.display='none';
+    if(document.getElementById('app').style.display!=='none')setTab('perso');
+    return;
+  }
+  // Autre joueur → modale stats lecture seule
+  const pp=_groupData.find(x=>x.uid===uid);
+  if(!pp)return;
+  const p=pp.charData||{};
+  const hp=p.hp||0;const hpMax=p.hpMax||1;
+  const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));
+  const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';
+  const portrait=p.portrait||p.equipPortrait;
+  const cls=(p.classes||[]).map(c=>`${c.name} ${c.level||1}`).join(' / ')||'—';
+  const conds=p.conditions||[];
+  const STATS=['FOR','DEX','CON','INT','SAG','CHA'];
+  const abilityNames=['strength','dexterity','constitution','intelligence','wisdom','charisma'];
+  const statsHtml=p.abilities?STATS.map((s,i)=>{
+    const v=p.abilities[i]||10;const mod=Math.floor((v-10)/2);
+    return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 6px">
+      <div style="font-size:9px;color:var(--text3);font-weight:600">${s}</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text)">${v}</div>
+      <div style="font-size:10px;color:var(--cp)">${mod>=0?'+':''}${mod}</div>
+    </div>`;}).join(''):'';
+  openModal(`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      ${portrait?`<img src="${portrait}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--cp)">`:`<div style="width:56px;height:56px;border-radius:50%;background:var(--surface2);border:2px solid var(--cp);display:flex;align-items:center;justify-content:center;font-size:26px">${pp.avatar||'⚔'}</div>`}
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--text)">${esc(p.charName||pp.playerName||'?')}</div>
+        <div style="font-size:12px;color:var(--text3)">${esc(cls)}</div>
+        <div style="font-size:11px;color:var(--text3)">${esc(pp.playerName||'')}</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="flex:1">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">PV</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:4px"></div></div>
+          <span style="font-size:13px;font-weight:700;color:${hp<=0?'#e53935':hpColor}">${hp<=0?'💀':hp+' / '+hpMax}</span>
+        </div>
+      </div>
+      ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px"><div style="font-size:9px;color:var(--text3)">CA</div><div style="font-size:18px;font-weight:700;color:var(--text)">${p.ac}</div></div>`:''}
+    </div>
+    ${conds.length?`<div style="margin-bottom:10px;font-size:12px;color:var(--text2)">Conditions : ${conds.join(' ')}</div>`:''}
+    ${statsHtml?`<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:14px">${statsHtml}</div>`:''}
+    <button class="btn" style="width:100%" onclick="closeModal()">Fermer</button>`);
+}
+
+// ═══════════════════════════════════════
+// TUTO GUIDÉ
+// ═══════════════════════════════════════
+const _TUTO_PLAYER=[
+  {icon:'🧰',title:'Bienvenue dans La Boîte à Outils !',text:'Ton compagnon numérique pour jouer à D&D 5e. Fiche de personnage, suivi de combat, sorts, inventaire, monnaie — tout en un, synchronisé en temps réel avec ton MJ.'},
+  {icon:'🏠',title:'Le Hub',text:'C\'est ta page d\'accueil. Ton MJ te donne un code de table — saisis-le pour rejoindre sa campagne. Tu peux aussi créer une table pour jouer seul ou tester l\'outil.'},
+  {icon:'🧑',title:'La fiche de personnage',text:'Une fois en campagne, tu accèdes à ta fiche. Plusieurs onglets : Perso (stats, caractéristiques), Combat, Sorts, Équipement, Sac, Journal... Tu peux naviguer librement entre eux.'},
+  {icon:'⚔️',title:'En combat',text:'Quand le MJ lance le combat, une bannière violette apparaît en haut quand c\'est ton tour. Clique sur ⏩ Fin de tour pour passer la main — le MJ et les autres joueurs le voient instantanément.'},
+  {icon:'🎒',title:'Sac & Bourse',text:'Ajoute des objets depuis le compendium ou manuellement. La Bourse convertit tes pièces automatiquement (10 pc → 1 pa, 5 pa → 1 pe, etc.). Change les quantités directement dans la liste.'},
+  {icon:'👥',title:'Le groupe',text:'Le bouton 👥 en bas à gauche affiche les PV de tes compagnons en temps réel. Un badge rouge signale un allié en danger. Clique sur un portrait pour voir ses stats, ou sur "Moi" pour retourner à ta fiche.'},
+  {icon:'💾',title:'Sauvegarde & Sync',text:'Tes modifications sont sauvegardées automatiquement après 3 secondes. Le point lumineux dans le header clignote lors d\'une mise à jour avec le serveur. Tu peux aussi cliquer 💾 manuellement à tout moment.'},
+];
+const _TUTO_MJ=[
+  {icon:'🎲',title:'Bienvenue, Maître du Jeu !',text:'L\'interface MJ se déverrouille avec le bouton 🎲 MJ en haut de la fiche. Elle est séparée pour ne pas mélanger tes infos secrètes avec celles des joueurs.'},
+  {icon:'🏠',title:'Créer une table',text:'Dans le Hub, crée une table. Tu obtiens un code à partager avec tes joueurs. Chaque table peut accueillir plusieurs campagnes, et tu peux en gérer plusieurs en parallèle.'},
+  {icon:'👥',title:'Onglet Joueurs',text:'Vois les PV, CA, initiative, conditions et notes secrètes de chaque joueur en temps réel. Tu peux modifier leurs stats directement (soins, dégâts, conditions) — ils voient les changements instantanément.'},
+  {icon:'⚔️',title:'Onglet Combat',text:'Lance l\'initiative (dé automatique ou manuel), ajoute des joueurs et des monstres. Le bouton ▶ Tour suivant notifie automatiquement le joueur concerné avec une bannière sur son écran.'},
+  {icon:'🐉',title:'PNJ & Monstres',text:'Crée des PNJ personnalisés ou importe directement depuis le compendium de 322 monstres (stats, attaques, PV préremplis). Gère leurs PV et attaques pendant la session depuis l\'onglet Combat.'},
+  {icon:'📚',title:'Page Règles',text:'Référence rapide en jeu : actions de combat, couverture, conditions, repos, exhaustion, magie sauvage... Sections réorganisables par glisser-déposer. Plus besoin de chercher dans le livre.'},
+  {icon:'🧰',title:'Compendiums personnalisés',text:'Dans ⚙ Profil → Mes compendiums, crée des recueils de sorts, objets ou capacités maison. Tu peux les partager avec ta table, les exporter et les importer. Chaque table peut en avoir un différent.'},
+];
+let _tutoIdx=0;
+let _tutoType='player';
+
+function startTutorial(type){
+  _tutoType=type||'player';
+  _tutoIdx=0;
+  _renderTutoStep();
+}
+function _renderTutoStep(){
+  const steps=_tutoType==='mj'?_TUTO_MJ:_TUTO_PLAYER;
+  const s=steps[_tutoIdx];
+  const total=steps.length;
+  const isLast=_tutoIdx===total-1;
+  const dots=Array.from({length:total},(_,i)=>`<div style="width:8px;height:8px;border-radius:50%;background:${i===_tutoIdx?'var(--cp)':'var(--surface2)'};border:1px solid ${i===_tutoIdx?'var(--cp)':'var(--border)'};transition:background .2s"></div>`).join('');
+  openModal(`
+    <div style="display:flex;justify-content:center;gap:6px;margin-bottom:18px">${dots}</div>
+    <div style="text-align:center;font-size:52px;margin-bottom:12px;line-height:1">${s.icon}</div>
+    <div style="text-align:center;font-size:16px;font-weight:700;color:var(--text);margin-bottom:10px">${s.title}</div>
+    <p style="text-align:center;font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:22px">${s.text}</p>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      ${_tutoIdx>0?`<button class="btn" style="flex:1" onclick="_tutoIdx--;_renderTutoStep()">← Préc.</button>`:''}
+      <button class="btn bac" style="flex:2" onclick="${isLast?'_tutoFinish()':'_tutoIdx++;_renderTutoStep()'}">
+        ${isLast?'✓ Terminer':'Suivant →'}
+      </button>
+    </div>
+    <div style="text-align:center">
+      <button class="btn bsm" style="font-size:11px;opacity:.55;border:none;background:none" onclick="_tutoFinish()">Passer le guide</button>
+    </div>`);
+}
+function _tutoFinish(){
+  closeModal();
+  localStorage.setItem(_tutoType==='mj'?'tuto_mj_done':'tuto_player_done','1');
+}
 
 function _updatePartyHUD(){
   const hud=document.getElementById('partyHud');
@@ -663,12 +762,12 @@ function _updatePartyHUD(){
     const conds=p.conditions||[];
     const dead=hp<=0;
     const dimmed=activeTurnUid&&!isActiveTurn;
-    return`<div class="party-member" style="${dimmed?'opacity:.45':''}">
+    return`<div class="party-member" style="${dimmed?'opacity:.45':''};cursor:pointer" onclick="_partyMemberClick('${pp.uid}')">
       <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}">
         ${portrait?`<img src="${portrait}">`:`<span>${pp.avatar||'⚔'}</span>`}
       </div>
       <div style="flex:1;min-width:0">
-        <div class="pm-name${isOwn?' self':''}">${esc(charName)}${isActiveTurn?' ⚔':''}</div>
+        <div class="pm-name${isOwn?' self':''}">${esc(charName)}${isActiveTurn?' ⚔':''}${isOwn?` <span style="font-size:9px;opacity:.6">Moi</span>`:''}</div>
         ${cls?`<div class="pm-sub">${esc(cls)}</div>`:''}
         <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
           <div class="pm-hp-bar" style="flex:1"><div class="pm-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
@@ -742,6 +841,7 @@ function showApp(){
   if(mjBtn) mjBtn.style.display='none';
   const hdrUser=document.getElementById('hdrUser');
   if(hdrUser&&currentUserData) hdrUser.textContent=`⚔ ${currentUserData.displayName}`;
+  if(!localStorage.getItem('tuto_player_done')) setTimeout(()=>startTutorial('player'),700);
 }
 
 // ─── AUTH UI ───
@@ -870,6 +970,16 @@ function openUserSettings(){
       </div>
     </details>
     <details class="acc">
+      <summary>❓ Aide & Guide</summary>
+      <div class="acc-body">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Revoir le guide de démarrage pas à pas.</p>
+        <div style="display:flex;gap:6px">
+          <button class="btn bsm" style="flex:1" onclick="closeModal();startTutorial('player')">📖 Guide Joueur</button>
+          <button class="btn bsm" style="flex:1" onclick="closeModal();startTutorial('mj')">🎲 Guide MJ</button>
+        </div>
+      </div>
+    </details>
+    <details class="acc">
       <summary>🔐 Compte</summary>
       <div class="acc-body">
         <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Email : <strong style="color:var(--text2)">${esc(currentUser.email)}</strong></div>
@@ -882,6 +992,7 @@ function openUserSettings(){
     </details>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px">
       <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.3)" onclick="closeModal();doLogout()">🚪 Déconnexion</button>
+      <button class="btn bsm" style="border-color:rgba(200,168,75,.4);color:var(--cp)" onclick="openFeedbackModal()">💬 Avis / Bug</button>
       <button class="btn" onclick="closeModal()">Fermer</button>
     </div>`);
   window._settingsAvatar=av;
@@ -979,6 +1090,40 @@ async function doDeleteAccount(){
     showToast('❌ '+(m[e.code]||e.message));
   }
 }
+function openFeedbackModal(){
+  openModal(`<div class="pt" style="margin-bottom:12px">💬 Avis & retours bêta</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Un bug ? Une idée ? Un truc qui manque ? Dis-nous tout — chaque retour compte.</p>
+    <div class="fl mb6">Type</div>
+    <select class="fi" id="fbType" style="margin-bottom:10px">
+      <option value="bug">🐛 Bug / problème</option>
+      <option value="suggestion">💡 Suggestion</option>
+      <option value="question">❓ Question</option>
+      <option value="autre">💬 Autre</option>
+    </select>
+    <div class="fl mb6">Message</div>
+    <textarea class="fi" id="fbMsg" placeholder="Décris le bug ou ton idée..." rows="5" style="resize:vertical;margin-bottom:12px"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="openUserSettings()">Annuler</button>
+      <button class="btn bac" style="flex:2" onclick="sendFeedback()">📤 Envoyer</button>
+    </div>`);
+}
+async function sendFeedback(){
+  const type=document.getElementById('fbType')?.value;
+  const msg=document.getElementById('fbMsg')?.value.trim();
+  if(!msg){showToast('❌ Le message ne peut pas être vide.');return;}
+  try{
+    await fbDb.collection('feedback').add({
+      userId:currentUser?.uid||'anonymous',
+      email:currentUser?.email||'',
+      type,
+      message:msg,
+      ts:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeModal();
+    showToast('✅ Merci pour ton retour !');
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
+
 async function saveUserSettings(){
   const name=document.getElementById('settingsName').value.trim();
   if(!name){showToast('❌ Le pseudo ne peut pas être vide.');return;}
@@ -2428,7 +2573,7 @@ async function uploadEquipPortrait(input){
 // RENDER
 // ═══════════════════════════════════════
 function render(){
-  if(currentCampaignId)_unsaved=true;
+  if(currentCampaignId){_unsaved=true;clearTimeout(_autoSaveTimer);_autoSaveTimer=setTimeout(saveAll,3000);}
   const p=P();const mc=mainClass(p);
   document.getElementById('app').className=mc?'th-'+mc.name:'';
   const hdr=document.getElementById('hdrChar');
@@ -5542,6 +5687,15 @@ document.addEventListener('click',e=>{
 
 createDiceButton();
 
+function createPartyHud(){
+  const hud=document.createElement('div');
+  hud.id='partyHud';
+  hud.style.cssText='position:fixed;bottom:24px;left:24px;z-index:850;display:none';
+  hud.innerHTML=`<div id="partyHudPanel" class="phud-panel" style="display:none"></div><div id="partyHudBtn" onclick="_togglePartyHud()" title="Groupe">👥<div id="partyHudBadge"></div></div>`;
+  document.body.appendChild(hud);
+}
+createPartyHud();
+
 // ═══════════════════════════════════════
 // INTERFACE MJ
 // ═══════════════════════════════════════
@@ -5555,6 +5709,7 @@ function showMJScreen(){
   if(el) el.textContent=(currentTableName?currentTableName+' — ':'')+currentCampaignName;
   _mjTab='joueurs';
   renderMJTabs();
+  if(!localStorage.getItem('tuto_mj_done')) setTimeout(()=>startTutorial('mj'),700);
 }
 
 function setMJTab(tab){
@@ -6483,7 +6638,7 @@ function mjOpenAddMonster(){
   const compSection=MONSTERS_DB
     ?`<div style="margin-bottom:12px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
         <div style="font-size:11px;font-weight:600;color:var(--cp);margin-bottom:6px">📚 Compendium (${MONSTERS_DB.length} monstres)</div>
-        <input class="fi" id="monSearch" placeholder="Rechercher : Gobelin, Dragon..." oninput="mjFilterMonsters(this.value)" style="margin-bottom:4px">
+        <input class="fi" id="monSearch" placeholder="Rechercher : Gobelin, Dragon..." oninput="mjFilterMonsters(this.value)" onfocus="mjFilterMonsters(this.value)" style="margin-bottom:4px">
         <div id="monResults" style="max-height:120px;overflow-y:auto"></div>
       </div>`
     :`<div style="text-align:center;margin-bottom:10px">
@@ -6561,7 +6716,7 @@ function mjOpenAddMonster(){
 
 function mjFilterMonsters(q){
   const el=document.getElementById('monResults');if(!el||!MONSTERS_DB)return;
-  if(!q.trim()){el.innerHTML='';return;}
+  if(!q.trim()){el.innerHTML=MONSTERS_DB.slice(0,15).map((m,i)=>`<div class="charlib-item" style="padding:5px 8px;cursor:pointer" onclick="mjFillMonster(${i})"><div style="flex:1"><div style="font-size:12px;font-weight:600">${esc(m.n)}</div><div style="font-size:11px;color:var(--text3)">CR ${m.cr||'?'} — CA ${m.ac||'?'} — ${m.hp||'?'} PV — ${m.t||''}</div></div><span style="color:var(--cp);font-size:11px">↑ Remplir</span></div>`).join('');return;}
   const low=q.toLowerCase();
   const res=[];
   for(let i=0;i<MONSTERS_DB.length&&res.length<20;i++){
@@ -7205,7 +7360,7 @@ function mjTabObjets(){
   const compSection=ITEMS_DB
     ?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
         <div style="font-size:12px;font-weight:600;color:var(--cp);margin-bottom:8px">📚 Compendium — ${ITEMS_DB.length.toLocaleString()} objets D&D 5e</div>
-        <input class="fi" id="itemSearch" placeholder="Chercher : Épée longue, Potion de soins, Anneau..." oninput="mjFilterItems(this.value)" style="margin-bottom:6px">
+        <input class="fi" id="itemSearch" placeholder="Chercher : Épée longue, Potion de soins, Anneau..." oninput="mjFilterItems(this.value)" onfocus="mjFilterItems(this.value)" style="margin-bottom:6px">
         <div id="itemResults" style="max-height:220px;overflow-y:auto"></div>
       </div>`
     :`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;text-align:center">
@@ -7225,14 +7380,14 @@ function mjTabObjets(){
 
 function mjFilterItems(q){
   const el=document.getElementById('itemResults');if(!el||!ITEMS_DB)return;
-  if(!q.trim()){el.innerHTML='';return;}
+  const TYPE_ICON={M:'⚔',S:'🗡',MA:'🛡',LA:'🛡',HA:'🛡',G:'🎒',W:'✨',R:'💍',RD:'🔱',ST:'🪄',WD:'🪄',P:'🧪',SC:'📜'};
+  if(!q.trim()){el.innerHTML=ITEMS_DB.slice(0,15).map((it,i)=>`<div class="charlib-item" style="padding:6px 8px;cursor:pointer" onclick="mjAddItemFromCompendium(${i})"><span style="font-size:16px">${TYPE_ICON[it.t]||'📦'}</span><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${esc(it.n)}</div><div style="font-size:11px;color:var(--text3)">${esc(it.d||'')}${it.mg?' ✨ Magique':''}</div></div><span style="color:var(--cp);font-size:11px;white-space:nowrap">+ Ajouter</span></div>`).join('');return;}
   const low=q.toLowerCase();
   const res=[];
   for(let i=0;i<ITEMS_DB.length&&res.length<30;i++){
     if(ITEMS_DB[i].n&&ITEMS_DB[i].n.toLowerCase().includes(low))res.push({i,it:ITEMS_DB[i]});
   }
   const RARITY_MAP={'très rare':'Très rare','peu commun':'Peu commun','légendaire':'Légendaire','artefact':'Artefact','commun':'Commun','rare':'Rare'};
-  const TYPE_ICON={M:'⚔',S:'🗡',MA:'🛡',LA:'🛡',HA:'🛡',G:'🎒',W:'✨',R:'💍',RD:'🔱',ST:'🪄',WD:'🪄',P:'🧪',SC:'📜'};
   el.innerHTML=res.length?res.map(({i,it})=>`<div class="charlib-item" style="padding:6px 8px;cursor:pointer" onclick="mjAddItemFromCompendium(${i})">
     <span style="font-size:16px">${TYPE_ICON[it.t]||'📦'}</span>
     <div style="flex:1;min-width:0">
