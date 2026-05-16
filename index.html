@@ -286,6 +286,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .acc[open] summary::after{transform:rotate(-180deg)}
 .acc summary:hover{background:var(--surface3)}
 .acc-body{padding:12px}
+.save-pending{animation:savePulse 1.4s ease-in-out infinite;border-color:var(--cp)!important;color:var(--cp)!important;background:rgba(200,168,75,.12)!important}
+@keyframes savePulse{0%,100%{box-shadow:0 0 0 0 rgba(200,168,75,.5)}50%{box-shadow:0 0 0 5px rgba(200,168,75,0)}}
 /* ===== PARTY HUD ===== */
 #partyHud{position:fixed;bottom:24px;left:24px;z-index:850;display:none}
 #partyHudBtn{width:52px;height:52px;border-radius:50%;background:var(--surface);border:2px solid var(--cp);color:var(--cp);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);transition:transform .15s;user-select:none;position:relative}
@@ -445,7 +447,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
     <span class="hdr-char" id="hdrChar" style="flex:1;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px">Fiche de personnage<span id="playerSyncDot" class="sync-dot" title="Mis à jour en temps réel"></span></span>
     <span id="hdrUser" style="display:none"></span>
     <button class="btn bsm" id="mjBtn" onclick="toggleMJ()" style="border-color:var(--cp);color:var(--cp);flex-shrink:0">🎲 MJ</button>
-    <button class="btn bac bsm" onclick="saveAll()" style="flex-shrink:0" title="Sauvegarder">💾</button>
+    <button class="btn bac bsm" id="saveBtn" onclick="saveAll()" style="flex-shrink:0" title="Sauvegarder">💾</button>
     <button class="hub-user-btn" onclick="openUserSettings()" title="Profil &amp; Déconnexion" style="flex-shrink:0">👤 Profil</button>
   </div>
   <!-- BANNIÈRE TOUR DE COMBAT -->
@@ -491,7 +493,6 @@ let _expandedCamp=null;
 let _unsubscribes=[];
 let _mjRenderDebounce=null;
 let _unsaved=false;
-let _autoSaveTimer=null;
 let _userInfoCache={};
 function stopAllListeners(){_unsubscribes.forEach(fn=>{try{fn();}catch(e){}});_unsubscribes=[];}
 window.addEventListener('beforeunload',e=>{if(_unsaved){e.preventDefault();e.returnValue='Des modifications ne sont pas sauvegardées. Quitter quand même ?';}});
@@ -2520,8 +2521,10 @@ function hasProficiency(p,itemName,itemType){
 // STORAGE
 // ═══════════════════════════════════════
 function getUserSK(){return currentUser?SK+'_'+currentUser.uid:SK;}
+function _markUnsaved(){_unsaved=true;const b=document.getElementById('saveBtn');if(b)b.classList.add('save-pending');}
+function _clearUnsaved(){_unsaved=false;const b=document.getElementById('saveBtn');if(b)b.classList.remove('save-pending');}
 async function saveAll(){
-  _unsaved=false;
+  _clearUnsaved();
   if(currentUser&&currentCampaignId&&state.players[0]){
     try{
       const p=state.players[0];
@@ -2573,7 +2576,7 @@ async function uploadEquipPortrait(input){
 // RENDER
 // ═══════════════════════════════════════
 function render(){
-  if(currentCampaignId){_unsaved=true;clearTimeout(_autoSaveTimer);_autoSaveTimer=setTimeout(saveAll,3000);}
+  if(currentCampaignId)_markUnsaved();
   const p=P();const mc=mainClass(p);
   document.getElementById('app').className=mc?'th-'+mc.name:'';
   const hdr=document.getElementById('hdrChar');
