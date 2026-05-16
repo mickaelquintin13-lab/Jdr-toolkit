@@ -149,9 +149,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 /* HUB */
 #hubScreen{display:none;min-height:100vh;padding:0}
-.hub-hdr{display:flex;flex-direction:column;gap:6px;padding:10px 16px;background:rgba(12,8,4,.75);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(200,168,75,.2);position:relative;z-index:2}
-.hub-hdr-title{font-family:var(--F);font-size:18px;color:var(--cp);letter-spacing:.08em;text-shadow:0 0 20px rgba(200,168,75,.4);line-height:1.2}
-.hub-hdr-row2{display:flex;align-items:center;justify-content:space-between;min-height:28px}
+.hub-hdr{display:flex;flex-direction:row;align-items:center;gap:10px;padding:10px 16px;background:rgba(12,8,4,.75);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(200,168,75,.2);position:relative;z-index:2}
+.hub-hdr-title{font-family:var(--F);font-size:18px;color:var(--cp);letter-spacing:.08em;text-shadow:0 0 20px rgba(200,168,75,.4);line-height:1.2;white-space:nowrap}
+.hub-hdr-row2{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
 .hub-body{max-width:920px;margin:0 auto;padding:16px;position:relative;z-index:1}
 .hub-section{margin-bottom:24px}
 .hub-section-title{font-family:var(--F);font-size:13px;color:var(--cp);letter-spacing:.06em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid rgba(200,168,75,.2);display:flex;align-items:center;justify-content:space-between}
@@ -287,14 +287,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .acc summary:hover{background:var(--surface3)}
 .acc-body{padding:12px}
 /* ===== PARTY HUD ===== */
-#partyHud{position:fixed;bottom:86px;left:12px;z-index:850;max-width:210px;display:none}
-.phud-toggle{display:flex;align-items:center;gap:6px;background:rgba(10,7,3,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(200,168,75,.35);border-radius:20px;padding:5px 12px;cursor:pointer;font-size:12px;color:var(--cp);font-family:var(--F);letter-spacing:.05em;user-select:none;transition:background .2s}
-.phud-toggle:hover{background:rgba(200,168,75,.12)}
-.phud-panel{background:rgba(10,7,3,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(200,168,75,.2);border-radius:10px;padding:8px 10px;margin-bottom:6px;min-width:175px}
+#partyHud{position:fixed;bottom:24px;left:24px;z-index:850;display:none}
+#partyHudBtn{width:52px;height:52px;border-radius:50%;background:var(--surface);border:2px solid var(--cp);color:var(--cp);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);transition:transform .15s;user-select:none;position:relative}
+#partyHudBtn:hover{transform:scale(1.08)}
+#partyHudBadge{position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:#e53935;border-radius:50%;border:2px solid var(--bg);font-size:9px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;display:none}
+.phud-panel{position:absolute;bottom:62px;left:0;background:rgba(10,7,3,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(200,168,75,.25);border-radius:10px;padding:8px 10px;min-width:195px;max-width:230px;box-shadow:0 8px 28px rgba(0,0,0,.6)}
 .party-member{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .party-member:last-child{border-bottom:none}
 .pm-portrait{width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:14px;border:1.5px solid var(--border)}
 .pm-portrait.self{border-color:var(--cp)}
+.pm-portrait.active-turn-portrait{border-color:#a78bfa;box-shadow:0 0 6px rgba(167,139,250,.7);animation:combatPulse 2s ease-in-out infinite}
 .pm-portrait img{width:100%;height:100%;object-fit:cover}
 .pm-hp-bar{height:4px;border-radius:2px;background:var(--surface3);margin-top:3px;overflow:hidden}
 .pm-hp-fill{height:100%;border-radius:2px;transition:width .6s}
@@ -305,6 +307,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .sync-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--cp);opacity:0;transition:opacity .3s;flex-shrink:0}
 .sync-dot.on{animation:syncPulse 2s ease-out forwards}
 @keyframes syncPulse{0%{opacity:1;transform:scale(1.2)}60%{opacity:.5;transform:scale(1)}100%{opacity:0}}
+/* ===== BANNIÈRE TOUR DE COMBAT ===== */
+#combatTurnBanner{display:none;background:linear-gradient(135deg,#6d28d9,#4338ca);color:white;padding:10px 14px;border-radius:8px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px;animation:combatPulse 2s ease-in-out infinite;box-shadow:0 2px 14px rgba(109,40,217,.5)}
+@keyframes combatPulse{0%,100%{box-shadow:0 2px 14px rgba(109,40,217,.5)}50%{box-shadow:0 2px 22px rgba(109,40,217,.85)}}
 /* ===== RESPONSIVE MOBILE ===== */
 @media(max-width:640px){
   /* Espacement global */
@@ -372,7 +377,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
       <div class="fl mb6" style="margin-top:0">Email</div>
       <input class="fi" id="loginEmail" type="email" placeholder="votre@email.com" style="margin-bottom:10px">
       <div class="fl mb6">Mot de passe</div>
-      <input class="fi" id="loginPassword" type="password" placeholder="••••••••" style="margin-bottom:16px">
+      <input class="fi" id="loginPassword" type="password" placeholder="••••••••" style="margin-bottom:8px">
+      <div style="text-align:right;margin-bottom:16px"><span style="font-size:12px;color:var(--cp);cursor:pointer;text-decoration:underline" onclick="doResetPassword()">Mot de passe oublié ?</span></div>
       <button class="btn bac" style="width:100%;padding:10px" onclick="doLogin()">Se connecter</button>
     </div>
 
@@ -410,10 +416,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
     <span class="hub-hdr-title">🧰 La Boîte à Outils</span>
     <div class="hub-hdr-row2">
       <div id="hubMJBadge" style="display:none;align-items:center;gap:5px;padding:3px 10px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;font-size:11px;color:var(--cp);font-family:var(--F);letter-spacing:.06em">🎲 Maître de Jeu</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
-        <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">⚔ Profil</button>
-        <button class="btn bsm" onclick="doLogout()" title="Déconnexion" style="color:#e53935;border-color:rgba(229,57,53,.3);padding:3px 8px;flex-shrink:0">🚪</button>
-      </div>
+      <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">⚔ Profil</button>
+      <button class="btn bsm" onclick="doLogout()" title="Déconnexion" style="color:#e53935;border-color:rgba(229,57,53,.3);padding:3px 8px;flex-shrink:0">🚪</button>
     </div>
   </div>
   <div class="hub-body">
@@ -444,16 +448,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
     <button class="btn bac bsm" onclick="saveAll()" style="flex-shrink:0" title="Sauvegarder">💾</button>
     <button class="hub-user-btn" onclick="openUserSettings()" title="Profil &amp; Déconnexion" style="flex-shrink:0">👤 Profil</button>
   </div>
+  <!-- BANNIÈRE TOUR DE COMBAT -->
+  <div id="combatTurnBanner">
+    <div>
+      <div style="font-size:10px;opacity:.75;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">⚔ Combat en cours</div>
+      <div style="font-size:15px;font-weight:700" id="combatTurnName">C'est votre tour !</div>
+    </div>
+    <button class="btn bsm" style="background:rgba(255,255,255,.15);color:white;border-color:rgba(255,255,255,.5);font-weight:600;flex-shrink:0" onclick="playerEndTurn()">⏩ Fin de tour</button>
+  </div>
   <div class="pbar" id="playerBar"></div>
   <div class="tabs" id="tabBar"></div>
   <div id="tabContent"></div>
   <!-- HUD GROUPE -->
   <div id="partyHud">
     <div id="partyHudPanel" class="phud-panel" style="display:none"></div>
-    <div class="phud-toggle" onclick="_togglePartyHud()">
-      <span>👥</span>
-      <span id="partyHudCount">Groupe</span>
-      <span id="partyHudChevron" style="font-size:10px;transition:transform .2s">▲</span>
+    <div id="partyHudBtn" onclick="_togglePartyHud()" title="Groupe">
+      👥
+      <div id="partyHudBadge"></div>
     </div>
   </div>
 </div>
@@ -481,12 +492,16 @@ let currentTableId=null;
 let currentCampaignId=null;
 let currentTableName='';
 let currentCampaignName='';
+let currentTableMjId=null;
+let _activeCombatState=null;
 let _expandedCamp=null;
 // ═══ SYNC TEMPS RÉEL ═══
 let _unsubscribes=[];
 let _mjRenderDebounce=null;
+let _unsaved=false;
 let _userInfoCache={};
 function stopAllListeners(){_unsubscribes.forEach(fn=>{try{fn();}catch(e){}});_unsubscribes=[];}
+window.addEventListener('beforeunload',e=>{if(_unsaved){e.preventDefault();e.returnValue='Des modifications ne sont pas sauvegardées. Quitter quand même ?';}});
 function _debouncedMJRender(){clearTimeout(_mjRenderDebounce);_mjRenderDebounce=setTimeout(()=>{renderMJContent();_flashSyncDot('mjSyncDot');},350);}
 function _flashSyncDot(id){const d=document.getElementById(id);if(!d)return;d.className='sync-dot on';setTimeout(()=>{d.className='sync-dot';},2500);}
 async function _getPlayerInfo(uid){
@@ -503,21 +518,24 @@ function startMJPlayersListener(campaignId){
         if(change.doc.id.endsWith('_mj'))continue;
         const data=change.doc.data();
         if(data.ejectedFromCampaign){
-          // Retirer le joueur expulsé (modifié ou supprimé)
           const wasPresent=_mjPlayersData.some(p=>p.docId===change.doc.id);
           if(wasPresent){_mjPlayersData=_mjPlayersData.filter(p=>p.docId!==change.doc.id);changed=true;}
+          continue;
+        }
+        // Joueur a signalé fin de son tour → avancer automatiquement
+        if(change.type==='modified'&&data.turnDone===true&&!change.doc.metadata.hasPendingWrites){
+          fbDb.collection('characters').doc(change.doc.id).update({turnDone:firebase.firestore.FieldValue.delete()}).catch(()=>{});
+          if(_mjCombatStarted)mjNextTurn();
           continue;
         }
         const uid=data.userId;
         const info=await _getPlayerInfo(uid);
         if(change.type==='added'){
-          // Évite les doublons si le listener est rechargé
           if(!_mjPlayersData.find(p=>p.docId===change.doc.id)){
             _mjPlayersData.push({uid,docId:change.doc.id,playerName:info.playerName,avatar:info.avatar,charData:data.characterData||{}});
             changed=true;
           }
         }else if(change.type==='modified'){
-          // Ignore les écritures locales en attente de confirmation serveur
           if(!change.doc.metadata.hasPendingWrites){
             const idx=_mjPlayersData.findIndex(p=>p.docId===change.doc.id);
             if(idx>=0){_mjPlayersData[idx].charData=data.characterData||{};changed=true;}
@@ -579,40 +597,78 @@ function startGroupListener(campaignId){
   _unsubscribes.push(unsub);
 }
 
+function startCombatListener(campaignId,mjUid){
+  const unsub=fbDb.collection('characters').doc(mjUid+'_'+campaignId+'_mj')
+    .onSnapshot(snap=>{
+      if(!snap.exists)return;
+      _updateCombatNotification(snap.data().combatState||null);
+    },err=>console.warn('Combat listener error:',err));
+  _unsubscribes.push(unsub);
+}
+function _updateCombatNotification(combatState){
+  _activeCombatState=combatState;
+  const banner=document.getElementById('combatTurnBanner');
+  if(banner){
+    const isMyTurn=combatState&&combatState.active&&combatState.currentTurnUid===currentUser?.uid;
+    banner.style.display=isMyTurn?'flex':'none';
+    if(isMyTurn){const nm=document.getElementById('combatTurnName');if(nm)nm.textContent='C\'est votre tour !';}
+  }
+  _updatePartyHUD();
+}
+async function playerEndTurn(){
+  if(!currentUser||!currentCampaignId)return;
+  try{
+    await fbDb.collection('characters').doc(currentUser.uid+'_'+currentCampaignId).update({turnDone:true});
+    const banner=document.getElementById('combatTurnBanner');
+    if(banner)banner.style.display='none';
+    showToast('⏩ Fin de tour signalée au MJ.');
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
 function _togglePartyHud(){
   _groupHudOpen=!_groupHudOpen;
   const panel=document.getElementById('partyHudPanel');
-  const chev=document.getElementById('partyHudChevron');
   if(panel)panel.style.display=_groupHudOpen?'block':'none';
-  if(chev)chev.style.transform=_groupHudOpen?'rotate(180deg)':'rotate(0deg)';
 }
 
 function _updatePartyHUD(){
   const hud=document.getElementById('partyHud');
   const panel=document.getElementById('partyHudPanel');
-  const cnt=document.getElementById('partyHudCount');
-  if(!hud||!panel)return;
+  const btn=document.getElementById('partyHudBtn');
+  const badge=document.getElementById('partyHudBadge');
+  if(!hud||!panel||!btn)return;
   if(_groupData.length<=1){hud.style.display='none';return;}
   hud.style.display='block';
-  if(cnt)cnt.textContent=_groupData.length+' joueurs';
-  const html=_groupData.map(pp=>{
+
+  // Badge : nombre de joueurs en danger (PV ≤ 25%)
+  const dangerCount=_groupData.filter(pp=>{const p=pp.charData||{};const pct=p.hpMax?p.hp/p.hpMax:1;return pct<=.25;}).length;
+  if(badge){
+    badge.style.display=dangerCount?'flex':'none';
+    badge.textContent=dangerCount||'';
+    badge.style.background=dangerCount?'#e53935':'transparent';
+  }
+
+  const activeTurnUid=_activeCombatState?.active?_activeCombatState.currentTurnUid:null;
+
+  panel.innerHTML=_groupData.map(pp=>{
     const p=pp.charData||{};
     const hp=p.hp||0;
     const hpMax=p.hpMax||1;
     const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));
     const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';
     const isOwn=pp.uid===currentUser?.uid;
+    const isActiveTurn=activeTurnUid&&pp.uid===activeTurnUid;
     const portrait=p.portrait||p.equipPortrait;
     const charName=p.charName||pp.playerName||'?';
     const cls=(p.classes||[]).map(c=>c.name).join('/');
     const conds=p.conditions||[];
     const dead=hp<=0;
-    return`<div class="party-member">
-      <div class="pm-portrait${isOwn?' self':''}">
+    const dimmed=activeTurnUid&&!isActiveTurn;
+    return`<div class="party-member" style="${dimmed?'opacity:.45':''}">
+      <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}">
         ${portrait?`<img src="${portrait}">`:`<span>${pp.avatar||'⚔'}</span>`}
       </div>
       <div style="flex:1;min-width:0">
-        <div class="pm-name${isOwn?' self':''}">${esc(charName)}</div>
+        <div class="pm-name${isOwn?' self':''}">${esc(charName)}${isActiveTurn?' ⚔':''}</div>
         ${cls?`<div class="pm-sub">${esc(cls)}</div>`:''}
         <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
           <div class="pm-hp-bar" style="flex:1"><div class="pm-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
@@ -622,7 +678,8 @@ function _updatePartyHUD(){
       </div>
     </div>`;
   }).join('');
-  panel.innerHTML=html;
+
+  if(!_groupHudOpen)panel.style.display='none';
 }
 let _mjJournal=[];
 let _journalSubTab='mj';
@@ -662,8 +719,9 @@ function showAuthScreen(){
 }
 function showHub(){
   stopAllListeners();
-  _groupData=[];
+  _groupData=[];_activeCombatState=null;_groupHudOpen=false;
   const hud=document.getElementById('partyHud');if(hud)hud.style.display='none';
+  const banner=document.getElementById('combatTurnBanner');if(banner)banner.style.display='none';
   const mjBadge=document.getElementById('hubMJBadge');if(mjBadge)mjBadge.style.display='none';
   document.getElementById('authScreen').style.display='none';
   document.getElementById('hubScreen').style.display='block';
@@ -709,6 +767,15 @@ async function doLogin(){
   try{await fbAuth.signInWithEmailAndPassword(email,pw);}
   catch(e){const m={'auth/user-not-found':'Aucun compte avec cet email.','auth/wrong-password':'Mot de passe incorrect.','auth/invalid-email':'Email invalide.','auth/invalid-credential':'Email ou mot de passe incorrect.'};showAuthError(m[e.code]||'Erreur : '+e.message);}
 }
+async function doResetPassword(){
+  const email=document.getElementById('loginEmail').value.trim();
+  if(!email){showAuthError('Entrez votre email ci-dessus, puis cliquez sur "Mot de passe oublié ?".');return;}
+  try{
+    await fbAuth.sendPasswordResetEmail(email);
+    document.getElementById('authError').style.display='none';
+    showToast('📧 Email de réinitialisation envoyé à '+email);
+  }catch(e){const m={'auth/user-not-found':'Aucun compte avec cet email.','auth/invalid-email':'Email invalide.'};showAuthError(m[e.code]||'Erreur : '+e.message);}
+}
 async function doRegister(){
   const name=document.getElementById('regName').value.trim();
   const email=document.getElementById('regEmail').value.trim();
@@ -719,6 +786,8 @@ async function doRegister(){
     const cred=await fbAuth.createUserWithEmailAndPassword(email,pw);
     await fbDb.collection('users').doc(cred.user.uid).set({displayName:name,avatar:selectedAvatar,email,charLib:{},createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     await cred.user.updateProfile({displayName:name});
+    cred.user.sendEmailVerification().catch(()=>{});
+    showToast('📧 Un email de vérification a été envoyé à '+email);
   }catch(e){const m={'auth/email-already-in-use':'Email déjà utilisé.','auth/invalid-email':'Email invalide.','auth/weak-password':'Mot de passe trop faible.'};showAuthError(m[e.code]||'Erreur : '+e.message);}
 }
 async function doLogout(){
@@ -1145,10 +1214,10 @@ function renderHubHTML(tables){
         const imgHtml=c.imageUrl?`<img src="${esc(c.imageUrl)}" style="width:100%;max-height:200px;border-radius:8px;object-fit:cover;margin-bottom:10px;display:block" onload="campImgOnLoad(this)" onerror="this.style.display='none'">`:'';
         const campParticipants=t._campParticipants&&t._campParticipants[c.id]||[];
         const participantHtml=campParticipants.length?`<div style="margin-top:10px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Personnages</div>
-          ${campParticipants.map(pp=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:6px;margin-bottom:4px;cursor:pointer" onclick="viewCharSheet('${pp.uid}','${c.id}')">
-            <span style="font-size:16px">${pp.avatar||'⚔'}</span>
-            <div style="flex:1"><div style="font-size:12px;font-weight:600">${esc(pp.charName||'?')}</div><div style="font-size:11px;color:var(--text3)">${esc(pp.charClass||'')} • ${esc(pp.playerName||'')}</div></div>
-            ${pp.uid===currentUser.uid?'<span style="font-size:10px;color:var(--cp)">Moi</span>':'<span style="font-size:10px;color:var(--cp);font-weight:600">Voir →</span>'}
+          ${campParticipants.map(pp=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:6px;margin-bottom:4px">
+            <span style="font-size:16px;cursor:pointer" onclick="viewCharSheet('${pp.uid}','${c.id}')">${pp.avatar||'⚔'}</span>
+            <div style="flex:1;min-width:0;cursor:pointer" onclick="viewCharSheet('${pp.uid}','${c.id}')"><div style="font-size:12px;font-weight:600">${esc(pp.charName||'?')}</div><div style="font-size:11px;color:var(--text3)">${esc(pp.charClass||'')} • ${esc(pp.playerName||'')}</div></div>
+            ${pp.uid===currentUser.uid?'<span style="font-size:10px;color:var(--cp)">Moi</span>':isMJ?`<button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.35);flex-shrink:0;font-size:10px" onclick="hubKickConfirm('${t.id}','${pp.uid}','${esc(pp.playerName||'ce joueur')}')">✕ Retirer</button>`:'<span style="font-size:10px;color:var(--cp);font-weight:600">→</span>'}
           </div>`).join('')}
         </div>`:'';
         const charBlock=isMJ
@@ -1448,6 +1517,26 @@ async function doJoinTable(code){
 }
 
 // ─── QUITTER UNE CAMPAGNE (JOUEUR) ───
+function hubKickConfirm(tableId,uid,playerName){
+  openModal(`<div class="pt" style="color:#e53935">⚠️ Retirer ce joueur ?</div>
+    <div style="font-size:13px;color:var(--text2);margin:10px 0 18px"><b>${esc(playerName)}</b> sera retiré de la table et ne pourra plus y accéder.<br><span style="font-size:11px;color:var(--text3)">Son personnage reste dans sa bibliothèque personnelle.</span></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="closeModal()">Annuler</button>
+      <button class="btn" style="flex:2;color:#e53935;border-color:rgba(229,57,53,.5);font-weight:600" onclick="hubKickMember('${tableId}','${uid}')">✓ Retirer de la table</button>
+    </div>`);
+}
+async function hubKickMember(tableId,uid){
+  closeModal();
+  try{
+    await fbDb.collection('tables').doc(tableId).update({
+      memberIds:firebase.firestore.FieldValue.arrayRemove(uid),
+      ['memberNames.'+uid]:firebase.firestore.FieldValue.delete(),
+      ['memberAvatars.'+uid]:firebase.firestore.FieldValue.delete()
+    });
+    showToast('✅ Joueur retiré de la table.');
+    renderHub();
+  }catch(e){showToast('❌ Erreur : '+e.message);}
+}
 function playerLeaveCharacter(campId){
   window._pendingLeave=campId;
   openModal(`<div class="pt" style="color:#e53935">Quitter la campagne ?</div>
@@ -1587,16 +1676,19 @@ async function enterCampaign(tableId,campaignId,tName,cName,preloadedCharData){
       }else{
         state.players=[migratePlayer(preloadedCharData||defPlayer(currentUserData?currentUserData.displayName:'Personnage'))];
       }
-      state.activeIdx=0;state.activeTab='perso';
+      state.activeIdx=0;
+      state.activeTab=localStorage.getItem('lastTab_'+campaignId)||'perso';
       _mjJournal=[];_journalSubTab='mj';_compilationData=null;
       showApp();
       await loadMJPool();
       render();
       // Lance les listeners temps réel
+      currentTableMjId=tableData?.mjId||null;
       stopAllListeners();
       _groupData=[];
       startPlayerListener(campaignId);
       startGroupListener(campaignId);
+      if(currentTableMjId)startCombatListener(campaignId,currentTableMjId);
     }
   }catch(e){showToast('❌ Erreur chargement : '+e.message);}
 }
@@ -1609,6 +1701,15 @@ async function openCampChronicle(tableId,campId){
   renderTabBar();
   renderTab();
 }
+
+// ─── CACHE INVALIDATION ───
+const _DB_VERSION='srd-v1';
+(function(){
+  if(localStorage.getItem('_db_version')!==_DB_VERSION){
+    ['dnd5e_spells_db','dnd5e_items_db','dnd5e_monsters_db','dnd5e_feats_db','dnd5e_races_db','dnd5e_backgrounds_db','dnd5e_classes_db'].forEach(k=>localStorage.removeItem(k));
+    localStorage.setItem('_db_version',_DB_VERSION);
+  }
+})();
 
 // ─── AUTH STATE ───
 fbAuth.onAuthStateChanged(async user=>{
@@ -2274,14 +2375,8 @@ function hasProficiency(p,itemName,itemType){
 // STORAGE
 // ═══════════════════════════════════════
 function getUserSK(){return currentUser?SK+'_'+currentUser.uid:SK;}
-async function loadAll(){
-  // Priorité : Firestore si dans une campagne, sinon localStorage
-  if(currentUser&&currentCampaignId){render();return;} // déjà chargé dans enterCampaign
-  try{const r=await window.storage.get(getUserSK());if(r&&r.value){const d=JSON.parse(r.value);state.players=(d.players||[]).map(migratePlayer);state.activeIdx=d.activeIdx||0;state.activeTab=d.activeTab||'perso';}}catch(e){}
-  if(!state.players.length)state.players=[defPlayer(currentUserData?currentUserData.displayName:'Joueur 1')];
-  render();
-}
 async function saveAll(){
+  _unsaved=false;
   if(currentUser&&currentCampaignId&&state.players[0]){
     try{
       const p=state.players[0];
@@ -2290,7 +2385,6 @@ async function saveAll(){
         characterData:p,
         updatedAt:firebase.firestore.FieldValue.serverTimestamp()
       },{merge:true});
-      // Met à jour la bibliothèque de personnages dans le profil utilisateur
       const charMeta={
         charName:p.charName||'Personnage',
         charClass:(p.classes||[]).map(c=>c.name+' '+c.level).join(' / '),
@@ -2302,7 +2396,7 @@ async function saveAll(){
       if(currentUserData){if(!currentUserData.charLib)currentUserData.charLib={};currentUserData.charLib[currentCampaignId]=charMeta;}
     }catch(e){console.error('Firestore save error',e);}
   }
-  try{await window.storage.set(getUserSK(),JSON.stringify(state));}catch(e){}
+  try{localStorage.setItem(getUserSK(),JSON.stringify(state));}catch(e){}
   showToast('✓ Sauvegardé');
 }
 function P(){return state.players[state.activeIdx]||state.players[0];}
@@ -2334,6 +2428,7 @@ async function uploadEquipPortrait(input){
 // RENDER
 // ═══════════════════════════════════════
 function render(){
+  if(currentCampaignId)_unsaved=true;
   const p=P();const mc=mainClass(p);
   document.getElementById('app').className=mc?'th-'+mc.name:'';
   const hdr=document.getElementById('hdrChar');
@@ -2371,7 +2466,7 @@ function renderTabBar(){
 
 function setTab(id){
   state.activeTab=id;
-  // Re-render la barre pour mettre à jour la surbrillance (source unique de vérité)
+  if(currentCampaignId)localStorage.setItem('lastTab_'+currentCampaignId,id);
   renderTabBar();
   const el=document.getElementById('tabContent');if(!el)return;
   const map={perso:tabPerso,competences:tabCompetences,combat:tabCombat,equipement:tabEquipement,sac:tabSac,historique:tabHistorique,xp:tabXP,sorts:tabSorts,levelup:tabLevelUp,journal:tabJournal};
@@ -2807,11 +2902,13 @@ function tabPerso(p){
         <div class="rest-btn short" onclick="doShortRest()">
           <div style="font-size:16px">☕</div>
           <div style="font-weight:600">Repos court</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px">≥ 1 heure</div>
           <div style="font-size:10px;margin-top:2px">Lance le dé de vie + CON</div>
         </div>
         <div class="rest-btn long" onclick="doLongRest()">
           <div style="font-size:16px">🌙</div>
           <div style="font-weight:600">Repos long</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px">≥ 8 heures</div>
           <div style="font-size:10px;margin-top:2px">PV max + sorts + charges</div>
         </div>
       </div>
@@ -2980,28 +3077,23 @@ function doShortRest(){
   const p=P();const mc=mainClass(p);const cd=mc?SRD.classes.find(c=>c.name===mc.name):null;if(!cd)return;
   const roll=Math.ceil(Math.random()*cd.hdVal)+mod(p.abilities[2]);
   const healed=Math.max(1,roll);p.hp=Math.min(p.hpMax,p.hp+healed);
-  // Récupération charges repos COURT uniquement
   if(!p.combatCharges)p.combatCharges={};
   (p.classes||[]).forEach(cls=>{
     const d=SRD.classes.find(c=>c.name===cls.name);
     if(!d||!d.combatFeatures)return;
     d.combatFeatures.forEach(f=>{
-      if(f.recovery==='short'){
-        const max=getChargesMax(f,p);
-        p.combatCharges[f.name]=max;
-      }
+      if(f.recovery==='short'){const max=getChargesMax(f,p);p.combatCharges[f.name]=max;}
     });
   });
-  // Occultiste récupère emplacements au repos court
   if((p.classes||[]).find(c=>c.name==='Occultiste'))p.spellSlotsUsed=[];
-  render();showToast(`☕ Repos court — ${cd.hd}(${roll-mod(p.abilities[2])})+CON = <strong>+${healed} PV</strong>`);
+  render();saveAll();showToast(`☕ Repos court — ${cd.hd}(${roll-mod(p.abilities[2])})+CON = <strong>+${healed} PV</strong>`);
 }
 function doLongRest(){
   const p=P();p.hp=p.hpMax;p.spellSlotsUsed=[];
   p.deathSaves={success:0,fail:0};
-  // Récupération toutes les charges
+  p.conditions=[];
   (p.classes||[]).forEach(cls=>{const d=SRD.classes.find(c=>c.name===cls.name);if(!d||!d.combatFeatures)return;d.combatFeatures.forEach(f=>{if(f.recovery!=='passive'){if(!p.combatCharges)p.combatCharges={};const max=getChargesMax(f,p);p.combatCharges[f.name]=max;}});});
-  render();showToast('🌙 Repos long — PV, sorts et charges récupérés !');
+  render();saveAll();showToast('🌙 Repos long — PV, sorts, charges et conditions récupérés !');
 }
 
 // ═══════════════════════════════════════
@@ -3802,11 +3894,13 @@ function mjToggleArmorProf(type){
 // ═══════════════════════════════════════
 function tabSac(p){
   const inv=p.inventory||[];const cur=p.currency||{pc:0,pa:0,pe:0,po:0,pp:0};
-  const invRows=inv.length?inv.map((item,i)=>`<div class="inv-item" style="flex-direction:column;align-items:flex-start;gap:4px">
+  const invRows=inv.length?inv.map((item,i)=>`<div class="inv-item" style="flex-direction:column;align-items:flex-start;gap:4px;${(item.qty||0)===0?'opacity:.6':''}">
     <div style="display:flex;align-items:center;gap:8px;width:100%">
-      <span style="flex:1;font-size:13px;font-weight:600">${esc(item.name)}${item.magic?` <span class="magic-badge">✨${item.linkedTo?' '+esc(item.linkedTo):''}</span>`:''}</span>
-      <input type="number" min="0" value="${item.qty||1}" oninput="p.inventory[${i}].qty=parseInt(this.value)||0" style="width:48px;background:var(--surface3);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);text-align:center;outline:none">
-      <span onclick="removeInvItem(${i})" style="cursor:pointer;color:var(--text3);font-size:15px">×</span>
+      <span style="flex:1;font-size:13px;font-weight:600">${esc(item.name)}${item.magic?` <span class="magic-badge">✨${item.linkedTo?' '+esc(item.linkedTo):''}</span>`:''} ${(item.qty||0)===0?'<span style="font-size:10px;color:#e53935;font-weight:600;border:1px solid rgba(229,57,53,.4);border-radius:4px;padding:0 4px">Épuisé</span>':''}</span>
+      <button class="btn bsm" style="padding:1px 6px;font-size:16px;line-height:1" onclick="adjustQty(${i},-1)">−</button>
+      <input type="number" min="0" value="${item.qty||0}" style="width:38px;text-align:center;font-size:13px;font-weight:600;color:${(item.qty||0)===0?'#e53935':'var(--text)'};background:transparent;border:1px solid var(--border);border-radius:4px;padding:1px 2px;outline:none" onchange="setQty(${i},this.value)" onclick="this.select()">
+      <button class="btn bsm" style="padding:1px 6px;font-size:16px;line-height:1" onclick="adjustQty(${i},+1)">+</button>
+      <span onclick="removeInvItem(${i})" style="cursor:pointer;color:var(--text3);font-size:15px;margin-left:4px">×</span>
     </div>
     ${item.desc?`<div style="font-size:11px;color:var(--text3)">${esc(item.desc)}</div>`:''}
     ${item.statBonuses&&item.statBonuses.length?`<div style="display:flex;gap:4px;flex-wrap:wrap">${item.statBonuses.map(b=>`<span class="status-badge ${b.value>0?'bonus':'malus'}" style="font-size:10px;padding:2px 6px">${b.stat.toUpperCase()} ${b.value>0?'+':''}${b.value}</span>`).join('')}</div>`:''}
@@ -3823,9 +3917,13 @@ function tabSac(p){
       <span style="font-size:10px;color:var(--text3);font-style:italic">Conversion automatique</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
-      ${[['pc','Cuivre','#b87333'],['pa','Argent','#b0bec5'],['pe','Électrum','#6abfad'],['po','Or','var(--cp)'],['pp','Platine','#dcdcdc']].map(([k,lbl,col])=>`<div class="coin"><div class="coin-lbl" style="color:${col}">${lbl}</div><input id="bourse_${k}" class="coin-val" type="number" min="0" value="${cur[k]||0}" oninput="setCurrency('${k}',this.value)"></div>`).join('')}
+      ${[['pc','Cuivre','#b87333'],['pa','Argent','#b0bec5'],['pe','Électrum','#6abfad'],['po','Or','var(--cp)'],['pp','Platine','#dcdcdc']].map(([k,lbl,col])=>`<div class="coin"><div class="coin-lbl" style="color:${col}">${lbl}</div><div id="bourse_${k}" class="coin-val" style="font-size:18px;font-weight:600;text-align:center;padding:4px 0;color:var(--text)">${cur[k]||0}</div></div>`).join('')}
     </div>
     <div style="margin-top:8px;font-size:10px;color:var(--text3);text-align:center">10 pc → 1 pa &nbsp;·&nbsp; 5 pa → 1 pe &nbsp;·&nbsp; 2 pe → 1 po &nbsp;·&nbsp; 10 po → 1 pp</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn bsm" style="flex:1;color:#4caf50;border-color:rgba(76,175,80,.5);font-weight:600" onclick="openBourseModal('gagner')">💰 Gagner</button>
+      <button class="btn bsm" style="flex:1;color:#e53935;border-color:rgba(229,57,53,.5);font-weight:600" onclick="openBourseModal('payer')">💸 Payer</button>
+    </div>
   </div>
   <div class="panel">
     <div class="pt" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -3833,10 +3931,10 @@ function tabSac(p){
       ${isMJ()?`<button class="btn bsm bac" onclick="openMJCreateItem()">🎲 Créer objet/arme</button>`:''}
     </div>
     <div style="display:flex;gap:6px;margin-bottom:4px">
-      <input class="fi" id="invName" placeholder="${ITEMS_DB?'Nom ou recherche parmi '+ITEMS_DB.length.toLocaleString()+' objets...':'Nom ou recherche compendium...'}" oninput="filterSrdItems(this.value)" style="flex:1">
+      <input class="fi" id="invName" placeholder="${ITEMS_DB?'Rechercher parmi '+ITEMS_DB.length.toLocaleString()+' objets...':'Nom ou recherche compendium...'}" oninput="filterSrdItems(this.value)" onfocus="filterSrdItems(this.value)" style="flex:1">
       <button class="btn bsm bac" onclick="addInvItem()">+</button>
     </div>
-    ${!ITEMS_DB?`<button class="btn bsm" style="font-size:11px;width:100%;margin-bottom:6px" onclick="loadItemsDB(()=>render())">📚 Charger le compendium (16 419 objets)</button>`:''}
+    ${!ITEMS_DB?`<button class="btn bsm" style="font-size:11px;width:100%;margin-bottom:6px" onclick="loadItemsDB(()=>render())">📚 Charger le compendium d'objets</button>`:''}
     <div id="srdList" style="margin-bottom:8px;max-height:220px;overflow-y:auto">${renderSrdList('')}</div>
     ${invRows}
   </div>
@@ -3860,7 +3958,7 @@ function toggleItemCharge(itemIdx,chargeIdx){
 function addPoolItemToSac(idx){
   const item=mjPool.customItems[idx];if(!item)return;
   const p=P();if(!p.inventory)p.inventory=[];
-  p.inventory.push({...item,chargesUsed:0});
+  _addToInventory(p,{...item,chargesUsed:0});
   render();showToast(`✓ "${item.name}" ajouté au sac`);
 }
 function autoConvertCurrency(){
@@ -3869,42 +3967,72 @@ function autoConvertCurrency(){
   if((c.pa||0)>=5){const g=Math.floor((c.pa||0)/5);c.pa=(c.pa||0)%5;c.pe=(c.pe||0)+g;}
   if((c.pe||0)>=2){const g=Math.floor((c.pe||0)/2);c.pe=(c.pe||0)%2;c.po=(c.po||0)+g;}
   if((c.po||0)>=10){const g=Math.floor((c.po||0)/10);c.po=(c.po||0)%10;c.pp=(c.pp||0)+g;}
-  ['pc','pa','pe','po','pp'].forEach(k=>{const el=document.getElementById('bourse_'+k);if(el)el.value=c[k]||0;});
+  ['pc','pa','pe','po','pp'].forEach(k=>{const el=document.getElementById('bourse_'+k);if(el)el.textContent=c[k]||0;});
 }
-function setCurrency(key,val){
-  const p=P();p.currency=p.currency||{};
-  p.currency[key]=parseInt(val)||0;
+function openBourseModal(type){
+  const isGain=type==='gagner';
+  const coins=[['pc','Cuivre','#b87333'],['pa','Argent','#b0bec5'],['pe','Électrum','#6abfad'],['po','Or','var(--cp)'],['pp','Platine','#dcdcdc']];
+  openModal(`<div class="pt" style="color:${isGain?'#4caf50':'#e53935'}">${isGain?'💰 Recevoir des pièces':'💸 Payer'}</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:14px 0">
+      ${coins.map(([k,lbl,col])=>`<div style="text-align:center"><div style="font-size:10px;color:${col};text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">${lbl}</div><input id="bm_${k}" class="fi" type="number" min="0" value="0" style="text-align:center;font-size:16px;font-weight:600;padding:6px 2px"></div>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="closeModal()">Annuler</button>
+      <button class="btn bac" style="flex:2;font-weight:600" onclick="confirmBourse('${type}')">${isGain?'✓ Recevoir':'✓ Payer'}</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('bm_pc')?.focus(),50);
+}
+function confirmBourse(type){
+  const p=P();const c=p.currency=p.currency||{};
+  const isGain=type==='gagner';
+  ['pc','pa','pe','po','pp'].forEach(k=>{
+    const val=parseInt(document.getElementById('bm_'+k)?.value)||0;
+    if(isGain) c[k]=(c[k]||0)+val;
+    else c[k]=Math.max(0,(c[k]||0)-val);
+  });
   autoConvertCurrency();
+  closeModal();
+  saveAll();
+  showToast(isGain?'💰 Pièces reçues !':'💸 Paiement effectué.');
+}
+function _addToInventory(p,item){
+  if(!p.inventory)p.inventory=[];
+  const ex=p.inventory.find(x=>x.name===item.name);
+  if(ex){ex.qty=(ex.qty||0)+(item.qty||1);}
+  else p.inventory.push(item);
 }
 function addInvItem(){
   const el=document.getElementById('invName');const n=el?.value?.trim();
-  if(!n)return;const p=P();if(!p.inventory)p.inventory=[];
-  p.inventory.push({name:n,qty:1,desc:'',magic:false,linkedTo:''});
+  if(!n)return;const p=P();
+  _addToInventory(p,{name:n,qty:1,desc:'',magic:false,linkedTo:''});
   if(el)el.value='';
   const sl=document.getElementById('srdList');if(sl)sl.innerHTML='';
   render();
 }
 function removeInvItem(i){P().inventory.splice(i,1);render();}
+function adjustQty(i,delta){const p=P();if(!p.inventory[i])return;p.inventory[i].qty=Math.max(0,(p.inventory[i].qty||0)+delta);render();}
+function setQty(i,val){const p=P();if(!p.inventory[i])return;p.inventory[i].qty=Math.max(0,parseInt(val)||0);render();}
 function renderSrdList(q){
+  const TYPE_ICON={M:'⚔',S:'🗡',MA:'🛡',LA:'🛡',HA:'🛡',G:'🎒',W:'✨',R:'💍',RD:'🔱',ST:'🪄',WD:'🪄',P:'🧪',SC:'📜'};
   if(ITEMS_DB){
-    if(!q.trim())return'<div style="font-size:11px;color:var(--text3);text-align:center;padding:6px">Tapez pour rechercher parmi '+ITEMS_DB.length.toLocaleString()+' objets.</div>';
-    const low=q.toLowerCase();
-    const TYPE_ICON={M:'⚔',S:'🗡',MA:'🛡',LA:'🛡',HA:'🛡',G:'🎒',W:'✨',R:'💍',RD:'🔱',ST:'🪄',WD:'🪄',P:'🧪',SC:'📜'};
+    const low=q.trim().toLowerCase();
     const res=[];
-    for(let i=0;i<ITEMS_DB.length&&res.length<15;i++){
-      if(ITEMS_DB[i].n&&ITEMS_DB[i].n.toLowerCase().includes(low))res.push({i,it:ITEMS_DB[i]});
+    const limit=low?15:30;
+    for(let i=0;i<ITEMS_DB.length&&res.length<limit;i++){
+      if(!low||ITEMS_DB[i].n&&ITEMS_DB[i].n.toLowerCase().includes(low))res.push({i,it:ITEMS_DB[i]});
     }
     if(!res.length)return'<div style="font-size:11px;color:var(--text3);text-align:center;padding:6px">Aucun résultat.</div>';
+    const suffix=!low&&ITEMS_DB.length>30?`<div style="font-size:10px;color:var(--text3);text-align:center;padding:4px">… et ${ITEMS_DB.length-30} autres — affinez la recherche</div>`:'';
     return res.map(({i,it})=>`<div class="aci" onclick="addCompendiumItem(${i})">
       <div class="ain">${TYPE_ICON[it.t]||'📦'} ${esc(it.n)}${it.mg?' ✨':''}</div>
       <div class="ais">${esc(it.d||'')}${it.d1?' — '+it.d1+(it.d2?' / '+it.d2:'')+(it.dt?' '+it.dt:''):''}${it.ac?' — CA '+it.ac:''}</div>
-    </div>`).join('');
+    </div>`).join('')+suffix;
   }
-  if(!q.trim())return'';
+  if(!q.trim())return[...SRD.weapons,...SRD.armors].slice(0,15).map(i=>`<div class="aci" onclick="addSrdItem('${esc(i.name)}','${esc(i.damage||i.ca||'')}','${esc(i.subtype||i.type||'')}')"><div class="ain">${esc(i.name)}</div><div class="ais">${esc(i.damage||i.ca||'')} — ${esc(i.price||'')}</div></div>`).join('');
   return[...SRD.weapons,...SRD.armors].filter(i=>i.name.toLowerCase().includes(q.toLowerCase())).slice(0,8).map(i=>`<div class="aci" onclick="addSrdItem('${esc(i.name)}','${esc(i.damage||i.ca||'')}','${esc(i.subtype||i.type||'')}')"><div class="ain">${esc(i.name)}</div><div class="ais">${esc(i.damage||i.ca||'')} — ${esc(i.price||'')}</div></div>`).join('');
 }
 function filterSrdItems(q){const el=document.getElementById('srdList');if(el)el.innerHTML=renderSrdList(q);}
-function addSrdItem(name,stats,type){const p=P();if(!p.inventory)p.inventory=[];p.inventory.push({name,qty:1,desc:`${type} — ${stats}`,magic:false,linkedTo:''});render();}
+function addSrdItem(name,stats,type){const p=P();_addToInventory(p,{name,qty:1,desc:`${type} — ${stats}`,magic:false,linkedTo:''});render();}
 function addCompendiumItem(idx){
   const it=ITEMS_DB[idx];if(!it)return;
   const p=P();if(!p.inventory)p.inventory=[];
@@ -3913,7 +4041,7 @@ function addCompendiumItem(idx){
   if(it.d1)desc+=(desc?' — ':'')+it.d1+(it.d2?' / '+it.d2:'')+(it.dt?' '+it.dt:'');
   if(it.ac)desc+=(desc?' — ':'')+'CA '+it.ac;
   if(it.d&&!desc)desc=it.d;
-  p.inventory.push({name:it.n,qty:1,desc:desc.trim(),magic:!!it.mg,linkedTo:''});
+  _addToInventory(p,{name:it.n,qty:1,desc:desc.trim(),magic:!!it.mg,linkedTo:''});
   render();showToast(`✓ "${it.n}" ajouté au sac`);
 }
 
@@ -5121,8 +5249,8 @@ let mjPool={customSpells:[],customItems:[]};
 
 async function loadMJPool(){
   try{
-    const r=await window.storage.get('dnd5e_mj_pool',true);
-    if(r&&r.value)mjPool=JSON.parse(r.value);
+    const saved=localStorage.getItem('dnd5e_mj_pool');
+    if(saved)mjPool=JSON.parse(saved);
   }catch(e){}
 }
 async function saveMJPool(){
@@ -5131,7 +5259,7 @@ async function saveMJPool(){
     _mjCompLib[_mjActiveCompId].items=mjPool.customItems||[];
     await saveMJCompLib();
   }else{
-    try{await window.storage.set('dnd5e_mj_pool',JSON.stringify(mjPool),true);}catch(e){}
+    try{localStorage.setItem('dnd5e_mj_pool',JSON.stringify(mjPool));}catch(e){}
   }
 }
 
@@ -5412,7 +5540,7 @@ document.addEventListener('click',e=>{
   }
 });
 
-createDiceButton(); // loadAll() et loadMJPool() sont appelés dans showApp() après connexion Firebase
+createDiceButton();
 
 // ═══════════════════════════════════════
 // INTERFACE MJ
@@ -5798,7 +5926,7 @@ async function loadMJCompLib(){
       // Migration depuis l'ancien système
       const oldFeats=data.customFeats||[];
       let oldSpells=[],oldItems=[];
-      try{const r=await window.storage.get('dnd5e_mj_pool',true);if(r&&r.value){const p=JSON.parse(r.value);oldSpells=p.customSpells||[];oldItems=p.customItems||[];}}catch(e){}
+      try{const saved=localStorage.getItem('dnd5e_mj_pool');if(saved){const p=JSON.parse(saved);oldSpells=p.customSpells||[];oldItems=p.customItems||[];}}catch(e){}
       if(oldFeats.length||oldSpells.length||oldItems.length){
         const id=_genCompId();
         _mjCompLib[id]={name:'Mon compendium',createdAt:new Date().toISOString(),feats:oldFeats,spells:oldSpells,items:oldItems};
@@ -6308,6 +6436,7 @@ function mjTabCombat(){
         <button class="btn bsm" style="font-size:10px;padding:2px 6px" onclick="mjOpenCondModal(${realIdx})">⚠</button>
         <button class="btn bsm" style="font-size:10px;padding:2px 6px;border-color:var(--cp);color:var(--cp)" onclick="mjOpenCombatDice(${realIdx})">🎲</button>
         <button class="btn bsm" style="font-size:10px;padding:2px 6px;color:#e53935;border-color:#e53935" onclick="mjRemoveCombatant(${realIdx})">✕</button>
+        ${isActive?`<button class="btn bsm" style="font-size:10px;padding:2px 8px;border-color:#7c3aed;color:#a78bfa;font-weight:600" onclick="mjNextTurn()">⏩</button>`:''}
       </div>
       <div style="width:36px;text-align:center;font-size:11px;color:var(--text3)">CA ${c.ac||0}</div>
     </div>`;
@@ -6589,11 +6718,20 @@ function mjConfirmAddFormTrait(){
 
 function mjRemoveFormTrait(i){_mjNewMonsterTraits.splice(i,1);mjRenderTraitsList();}
 
+async function _mjSaveCombatState(sorted,turnIdx){
+  if(!currentUser||!currentCampaignId)return;
+  const cur=sorted[turnIdx%sorted.length];
+  const combatState=cur?{active:true,currentTurnUid:cur.uid||null,currentTurnName:cur.name||'?',round:_mjRound}:{active:false};
+  try{await fbDb.collection('characters').doc(currentUser.uid+'_'+currentCampaignId+'_mj').update({combatState});}
+  catch(e){console.warn('Error saving combat state:',e);}
+}
+
 function mjStartCombat(){
   _mjCombatants.forEach(c=>{c.initiative=Math.ceil(Math.random()*20)+(c.dexMod||0);});
   _mjCombatStarted=true;_mjCurrentTurn=0;_mjRound=1;
   const sorted=[..._mjCombatants].sort((a,b)=>b.initiative-a.initiative);
   _mjCombatLog.push(`🎲 Initiative lancée — Round 1. Premier : ${esc(sorted[0]?.name||'?')} (${sorted[0]?.initiative||0})`);
+  _mjSaveCombatState(sorted,0);
   renderMJContent();
 }
 
@@ -6604,12 +6742,16 @@ function mjNextTurn(){
   if(_mjCurrentTurn>=sorted.length){_mjCurrentTurn=0;_mjRound++;_mjCombatLog.push(`🔄 Début du Round ${_mjRound}.`);}
   const cur=sorted[_mjCurrentTurn];
   _mjCombatLog.push(`▶ Tour de ${esc(cur?.name||'?')}`);
+  _mjSaveCombatState(sorted,_mjCurrentTurn);
   renderMJContent();
 }
 
 function mjResetCombat(){
   if(!confirm('Réinitialiser le combat ?'))return;
   _mjCombatants=[];_mjCombatStarted=false;_mjCurrentTurn=0;_mjRound=1;_mjCombatLog=[];
+  if(currentUser&&currentCampaignId){
+    fbDb.collection('characters').doc(currentUser.uid+'_'+currentCampaignId+'_mj').update({combatState:{active:false}}).catch(()=>{});
+  }
   renderMJContent();
 }
 
@@ -7067,7 +7209,7 @@ function mjTabObjets(){
         <div id="itemResults" style="max-height:220px;overflow-y:auto"></div>
       </div>`
     :`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;text-align:center">
-        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Chargez le compendium pour ajouter des objets depuis la base D&D 5e (16 419 objets)</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Chargez le compendium pour ajouter des objets depuis la base D&amp;D 5e SRD.</div>
         <button class="btn bsm bprimary" onclick="loadItemsDB(()=>renderMJContent())">📚 Charger le compendium d'objets</button>
       </div>`;
 
@@ -7219,12 +7361,14 @@ function toggleRuleSection(id){
   if(body)body.style.display=_rulesCollapsed[id]?'none':'';
   if(chev)chev.style.transform=_rulesCollapsed[id]?'rotate(-90deg)':'rotate(0deg)';
 }
-function getMjRulesOrder(){try{const o=localStorage.getItem('mj_rules_order');if(o)return JSON.parse(o);}catch(e){}return[];}
+const _mjRulesDefaultOrder=['s-actions','s-couverture','s-conditions','s-mort','s-armes-c','s-armes-g','s-armures','s-dc','s-modifs','s-repos','s-epuisement','s-voyage','s-vie','s-magie-sauvage','s-compendium'];
+function getMjRulesOrder(){try{const o=localStorage.getItem('mj_rules_order');if(o)return JSON.parse(o);}catch(e){}return _mjRulesDefaultOrder;}
 function saveMjRulesOrder(){const c=document.getElementById('mjRulesContainer');if(!c)return;localStorage.setItem('mj_rules_order',JSON.stringify([...c.querySelectorAll(':scope>[data-ruleid]')].map(e=>e.dataset.ruleid)));}
 function mjInitRulesDnD(){
   const c=document.getElementById('mjRulesContainer');if(!c)return;
-  const order=getMjRulesOrder();if(!order.length)return;
+  const order=getMjRulesOrder();
   const map={};c.querySelectorAll(':scope>[data-ruleid]').forEach(e=>map[e.dataset.ruleid]=e);
+  // Applique l'ordre (sauvegardé ou par défaut), les nouvelles sections non listées restent à la fin
   order.forEach(id=>{if(map[id])c.appendChild(map[id]);});
 }
 function mjRuleDragStart(id,el){_mjDragRuleId=id;setTimeout(()=>el.classList.add('mj-dragging'),0);}
@@ -7379,31 +7523,29 @@ function mjTabRegles(){
         <tr><td>Bouclier</td><td>+2</td><td>—</td></tr>
       </table>`)}
     </div>`)}
-    ${ds('s-modifs',`${gh('s-modifs','Modificateurs &amp; Fatigue / Faim')}
-    ${rb('s-modifs',`<div class="g2" style="gap:10px">
-      <div class="regles-section">
-        <div class="pt">🎒 Modificateurs de caractéristiques</div>
-        <table class="regles-table">
-          <tr><th>Score</th><th>Mod.</th></tr>
-          <tr><td>1</td><td style="color:#e53935">−5</td></tr>
-          <tr><td>2–3</td><td style="color:#e53935">−4</td></tr>
-          <tr><td>4–5</td><td style="color:#e53935">−3</td></tr>
-          <tr><td>6–7</td><td style="color:#e53935">−2</td></tr>
-          <tr><td>8–9</td><td style="color:#e53935">−1</td></tr>
-          <tr><td>10–11</td><td>+0</td></tr>
-          <tr><td>12–13</td><td style="color:var(--cp)">+1</td></tr>
-          <tr><td>14–15</td><td style="color:var(--cp)">+2</td></tr>
-          <tr><td>16–17</td><td style="color:var(--cp)">+3</td></tr>
-          <tr><td>18–19</td><td style="color:var(--cp)">+4</td></tr>
-          <tr><td>20–21</td><td style="color:var(--cp)">+5</td></tr>
-          <tr><td>22–23</td><td style="color:var(--cp)">+6</td></tr>
-          <tr><td>24–25</td><td style="color:var(--cp)">+7</td></tr>
-          <tr><td>28–30</td><td style="color:var(--cp)">+9/+10</td></tr>
-        </table>
-      </div>
-      <div class="regles-section">
-        <div class="pt">😵 Épuisement & 🍖 Faim/Soif</div>
-        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Niveaux d'épuisement</div>
+    ${ds('s-modifs',`<div class="regles-section">
+      ${dh('s-modifs','🎲 Modificateurs de caractéristiques')}
+      ${rb('s-modifs',`<table class="regles-table">
+        <tr><th>Score</th><th>Mod.</th></tr>
+        <tr><td>1</td><td style="color:#e53935">−5</td></tr>
+        <tr><td>2–3</td><td style="color:#e53935">−4</td></tr>
+        <tr><td>4–5</td><td style="color:#e53935">−3</td></tr>
+        <tr><td>6–7</td><td style="color:#e53935">−2</td></tr>
+        <tr><td>8–9</td><td style="color:#e53935">−1</td></tr>
+        <tr><td>10–11</td><td>+0</td></tr>
+        <tr><td>12–13</td><td style="color:var(--cp)">+1</td></tr>
+        <tr><td>14–15</td><td style="color:var(--cp)">+2</td></tr>
+        <tr><td>16–17</td><td style="color:var(--cp)">+3</td></tr>
+        <tr><td>18–19</td><td style="color:var(--cp)">+4</td></tr>
+        <tr><td>20–21</td><td style="color:var(--cp)">+5</td></tr>
+        <tr><td>22–23</td><td style="color:var(--cp)">+6</td></tr>
+        <tr><td>24–25</td><td style="color:var(--cp)">+7</td></tr>
+        <tr><td>28–30</td><td style="color:var(--cp)">+9/+10</td></tr>
+      </table>`)}
+    </div>`)}
+    ${ds('s-epuisement',`<div class="regles-section">
+      ${dh('s-epuisement','😵 Épuisement · 🍖 Faim & Soif')}
+      ${rb('s-epuisement',`<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Niveaux d'épuisement</div>
         <table class="regles-table">
           <tr><th>Niv.</th><th>Effet</th></tr>
           <tr><td>1</td><td>Désavantage aux jets de caractéristique</td></tr>
@@ -7424,9 +7566,8 @@ function mjTabRegles(){
           Besoin : <strong>3,5 l/jour</strong> (7 l en chaleur extrême).<br>
           Sans eau 1 jour → JS CON DD 15 ou +1 épuisement (+2 si raté de 5+).<br>
           Armure intermédiaire/lourde → désavantage au jet.
-        </div>
-      </div>
-    </div>`)}`)}
+        </div>`)}
+    </div>`)}
     ${ds('s-voyage',`${gh('s-voyage','Voyage &amp; Lumière')}
     ${rb('s-voyage',`<div class="g2" style="gap:10px">
       <div class="regles-section">
