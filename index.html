@@ -567,6 +567,7 @@ function startPlayerListener(campaignId){
 let _groupData=[];
 let _groupHudOpen=false;
 let _groupOnlyMode=false;
+let _hudExpandedUids=new Set();
 
 function startGroupListener(campaignId){
   const unsub=fbDb.collection('characters').where('campaignId','==',campaignId)
@@ -852,31 +853,37 @@ function _updatePartyHUD(){
       const conds=p.conditions||[];
       const dead=hp<=0;
       const dimmed=combatActive&&!isActiveTurn&&!isOwn;
+      const expanded=_hudExpandedUids.has(pp.uid);
       const statsHtml=p.abilities?STATS_SH.map((s,i)=>{const v=p.abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px"><div style="font-size:8px;color:var(--text3)">${s}</div><div style="font-size:11px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:8px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join(''):'';
-      return`<div class="party-member" data-uid="${pp.uid}" style="${dimmed?'opacity:.4':''}">
-        <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}" style="cursor:pointer;width:34px;height:34px;align-self:flex-start;margin-top:2px" data-uid="${pp.uid}">
+      return`<div class="party-member" data-uid="${pp.uid}" style="${dimmed?'opacity:.4':''}cursor:pointer">
+        <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}" style="width:34px;height:34px;align-self:flex-start;margin-top:2px;flex-shrink:0">
           ${portrait?`<img src="${portrait}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:16px">${pp.avatar||'⚔'}</span>`}
         </div>
         <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
-            <span class="pm-name${isOwn?' self':''}" style="max-width:120px">${esc(charName)}</span>
+          <!-- Vue compacte — toujours visible -->
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="pm-name${isOwn?' self':''}">${esc(charName)}</span>
             <span style="font-size:9px;color:${isOwn?'var(--cp)':'var(--text3)'};opacity:.8;flex-shrink:0">${isOwn?'Moi':esc(pp.playerName||'')}</span>
           </div>
-          ${subLine?`<div class="pm-sub">${esc(subLine)}</div>`:''}
-          ${!isOwn?`<div class="pm-sub">Joueur : ${esc(pp.playerName||'')}</div>`:''}
-          <div class="pm-combat-badge ${combatActive?'pm-combat-active':'pm-combat-inactive'}">
-            ${combatActive?(isActiveTurn?'⚔ Son tour':'⚔ En combat'):'🏳 Hors combat'}
-          </div>
-          <div style="display:flex;align-items:center;gap:5px;margin-top:3px">
+          <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
             <div class="pm-hp-bar" style="flex:1"><div class="pm-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
             <span style="font-size:9px;color:${dead?'#e53935':hpColor};flex-shrink:0;font-weight:700">${dead?'💀':hp+'/'+hpMax}</span>
-            ${p.ac?`<span style="font-size:9px;color:var(--text3);flex-shrink:0">CA ${p.ac}</span>`:''}
           </div>
           ${conds.length?`<div class="pm-sub" style="margin-top:1px">${conds.slice(0,3).join(' ')}${conds.length>3?` <span style="opacity:.55">+${conds.length-3}</span>`:''}</div>`:''}
           ${_buildChargeChips(p)}
-          ${statsHtml?`<details style="margin-top:4px"><summary style="font-size:9px;color:var(--text3);cursor:pointer;list-style:none;display:flex;align-items:center;gap:3px"><span>▶</span> Caractéristiques</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:4px">${statsHtml}</div></details>`:''}
+          <!-- Vue détaillée — visible si carte dépliée -->
+          ${expanded?`
+          <div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.07)">
+            ${subLine?`<div class="pm-sub">${esc(subLine)}</div>`:''}
+            ${!isOwn?`<div class="pm-sub">Joueur : ${esc(pp.playerName||'')}</div>`:''}
+            <div class="pm-combat-badge ${combatActive?'pm-combat-active':'pm-combat-inactive'}" style="margin-top:3px">
+              ${combatActive?(isActiveTurn?'⚔ Son tour':'⚔ En combat'):'🏳 Hors combat'}
+            </div>
+            ${p.ac?`<div class="pm-sub" style="margin-top:3px">CA ${p.ac}</div>`:''}
+            ${statsHtml?`<details style="margin-top:5px"><summary style="font-size:9px;color:var(--text3);cursor:pointer;list-style:none;display:flex;align-items:center;gap:3px"><span>▶</span> Caractéristiques</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:4px">${statsHtml}</div></details>`:''}
+            <button data-sheet-uid="${pp.uid}" data-own="${isOwn}" style="background:none;border:1px solid rgba(200,168,75,.25);border-radius:6px;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 7px;margin-top:5px;width:100%" title="${isOwn?'Ma fiche':'Voir la fiche'}">📋 ${isOwn?'Ma fiche':'Voir la fiche'}</button>
+          </div>`:''}
         </div>
-        <button data-sheet-uid="${pp.uid}" data-own="${isOwn}" style="background:none;border:1px solid rgba(200,168,75,.25);border-radius:6px;color:var(--text3);cursor:pointer;font-size:13px;padding:3px 6px;flex-shrink:0;align-self:flex-start;margin-top:2px" title="${isOwn?'Ma fiche':'Voir la fiche'}">📋</button>
       </div>`;
     }).join('');
 
@@ -888,6 +895,14 @@ function _updatePartyHUD(){
     if(btn){
       if(btn.dataset.own==='true')enterCampaign(currentTableId,currentCampaignId);
       else _partyMemberClick(btn.dataset.sheetUid);
+      return;
+    }
+    const card=e.target.closest('.party-member');
+    if(card&&card.dataset.uid){
+      const uid=card.dataset.uid;
+      if(_hudExpandedUids.has(uid))_hudExpandedUids.delete(uid);
+      else _hudExpandedUids.add(uid);
+      _updatePartyHUD();
     }
   };
 
