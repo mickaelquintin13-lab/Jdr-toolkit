@@ -567,7 +567,7 @@ function startPlayerListener(campaignId){
 let _groupData=[];
 let _groupHudOpen=false;
 let _groupOnlyMode=false;
-let _hudExpandedUids=new Set();
+let _currentHudDetailUid=null;
 
 function startGroupListener(campaignId){
   const unsub=fbDb.collection('characters').where('campaignId','==',campaignId)
@@ -628,6 +628,7 @@ function _togglePartyHud(){
   _groupHudOpen=!_groupHudOpen;
   const panel=document.getElementById('partyHudPanel');
   if(panel)panel.style.display=_groupHudOpen?'block':'none';
+  if(!_groupHudOpen)_hideHudDetail();
 }
 function _partyMemberClick(uid){
   const pp=_groupData.find(x=>x.uid===uid);
@@ -853,14 +854,12 @@ function _updatePartyHUD(){
       const conds=p.conditions||[];
       const dead=hp<=0;
       const dimmed=combatActive&&!isActiveTurn&&!isOwn;
-      const expanded=_hudExpandedUids.has(pp.uid);
-      const statsHtml=p.abilities?STATS_SH.map((s,i)=>{const v=p.abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px"><div style="font-size:8px;color:var(--text3)">${s}</div><div style="font-size:11px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:8px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join(''):'';
-      return`<div class="party-member" data-uid="${pp.uid}" style="${dimmed?'opacity:.4':''}cursor:pointer">
+      const isSelected=_currentHudDetailUid===pp.uid;
+      return`<div class="party-member" data-uid="${pp.uid}" style="${dimmed?'opacity:.4;':''}cursor:pointer;${isSelected?'background:rgba(200,168,75,.07);border-radius:6px;':''}">
         <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}" style="width:34px;height:34px;align-self:flex-start;margin-top:2px;flex-shrink:0">
           ${portrait?`<img src="${portrait}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:16px">${pp.avatar||'⚔'}</span>`}
         </div>
         <div style="flex:1;min-width:0">
-          <!-- Vue compacte — toujours visible -->
           <div style="display:flex;align-items:center;gap:4px">
             <span class="pm-name${isOwn?' self':''}">${esc(charName)}</span>
             <span style="font-size:9px;color:${isOwn?'var(--cp)':'var(--text3)'};opacity:.8;flex-shrink:0">${isOwn?'Moi':esc(pp.playerName||'')}</span>
@@ -871,42 +870,99 @@ function _updatePartyHUD(){
           </div>
           ${conds.length?`<div class="pm-sub" style="margin-top:1px">${conds.slice(0,3).join(' ')}${conds.length>3?` <span style="opacity:.55">+${conds.length-3}</span>`:''}</div>`:''}
           ${_buildChargeChips(p)}
-          <!-- Vue détaillée — visible si carte dépliée -->
-          ${expanded?`
-          <div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.07)">
-            ${subLine?`<div class="pm-sub">${esc(subLine)}</div>`:''}
-            ${!isOwn?`<div class="pm-sub">Joueur : ${esc(pp.playerName||'')}</div>`:''}
-            <div class="pm-combat-badge ${combatActive?'pm-combat-active':'pm-combat-inactive'}" style="margin-top:3px">
-              ${combatActive?(isActiveTurn?'⚔ Son tour':'⚔ En combat'):'🏳 Hors combat'}
-            </div>
-            ${p.ac?`<div class="pm-sub" style="margin-top:3px">CA ${p.ac}</div>`:''}
-            ${statsHtml?`<details style="margin-top:5px"><summary style="font-size:9px;color:var(--text3);cursor:pointer;list-style:none;display:flex;align-items:center;gap:3px"><span>▶</span> Caractéristiques</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:4px">${statsHtml}</div></details>`:''}
-            <button data-sheet-uid="${pp.uid}" data-own="${isOwn}" style="background:none;border:1px solid rgba(200,168,75,.25);border-radius:6px;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 7px;margin-top:5px;width:100%" title="${isOwn?'Ma fiche':'Voir la fiche'}">📋 ${isOwn?'Ma fiche':'Voir la fiche'}</button>
-          </div>`:''}
         </div>
       </div>`;
     }).join('');
 
   panel.innerHTML=headerHtml+membersHtml;
 
+  // Rafraîchit le panneau détail si un joueur est sélectionné
+  if(_currentHudDetailUid)_showHudDetail(_currentHudDetailUid);
+
   panel.onclick=e=>{
     if(e.target.closest('summary'))return;
-    const btn=e.target.closest('[data-sheet-uid]');
-    if(btn){
-      if(btn.dataset.own==='true')enterCampaign(currentTableId,currentCampaignId);
-      else _partyMemberClick(btn.dataset.sheetUid);
-      return;
-    }
     const card=e.target.closest('.party-member');
     if(card&&card.dataset.uid){
       const uid=card.dataset.uid;
-      if(_hudExpandedUids.has(uid))_hudExpandedUids.delete(uid);
-      else _hudExpandedUids.add(uid);
-      _updatePartyHUD();
+      if(_currentHudDetailUid===uid){_hideHudDetail();_updatePartyHUD();}
+      else{_showHudDetail(uid);_updatePartyHUD();}
     }
   };
 
   if(!_groupHudOpen)panel.style.display='none';
+}
+function _hideHudDetail(){
+  _currentHudDetailUid=null;
+  const el=document.getElementById('hudDetailPopup');
+  if(el)el.remove();
+}
+function _showHudDetail(uid){
+  const pp=_groupData.find(x=>x.uid===uid);
+  if(!pp){_hideHudDetail();return;}
+  _currentHudDetailUid=uid;
+  const p=pp.charData||{};
+  const isOwn=uid===currentUser?.uid;
+  const portrait=p.portrait||p.equipPortrait;
+  const cls=(p.classes||[]).map(c=>c.name+' '+c.level).join(' / ');
+  const race=p.race||'';const bg=p.background||'';
+  const subLine=[cls,race+(bg?' · '+bg:'')].filter(Boolean).join(' · ');
+  const combatActive=!!(_activeCombatState?.active);
+  const isActiveTurn=combatActive&&_activeCombatState.currentTurnUid===uid;
+  const hp=p.hp||0;const hpMax=p.hpMax||1;
+  const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));
+  const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';
+  const dead=hp<=0;
+  const conds=p.conditions||[];
+  const STATS_SH=['FOR','DEX','CON','INT','SAG','CHA'];
+  const statsHtml=p.abilities?STATS_SH.map((s,i)=>{const v=p.abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px"><div style="font-size:8px;color:var(--text3)">${s}</div><div style="font-size:12px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:8px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join(''):'';
+  const chargesHtml=_buildChargeChips(p);
+
+  let el=document.getElementById('hudDetailPopup');
+  if(!el){
+    el=document.createElement('div');
+    el.id='hudDetailPopup';
+    el.style.cssText='position:fixed;z-index:851;background:rgba(10,7,3,.96);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(200,168,75,.3);border-radius:10px;padding:10px 12px;width:210px;box-shadow:0 8px 28px rgba(0,0,0,.65)';
+    document.body.appendChild(el);
+  }
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)">
+      ${portrait?`<img src="${portrait}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--cp);flex-shrink:0">`:`<div style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--cp);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${pp.avatar||'⚔'}</div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:${isOwn?'var(--cp)':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.charName||pp.playerName||'?')}</div>
+        <div style="font-size:9px;color:var(--text3)">${isOwn?'Moi':esc(pp.playerName||'')}</div>
+      </div>
+      <button onclick="_hideHudDetail();_updatePartyHUD()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0 2px;flex-shrink:0">✕</button>
+    </div>
+    ${subLine?`<div style="font-size:10px;color:var(--text3);margin-bottom:6px">${esc(subLine)}</div>`:''}
+    ${!isOwn?`<div style="font-size:10px;color:var(--text3);margin-bottom:6px">Joueur : ${esc(pp.playerName||'')}</div>`:''}
+    <div class="pm-combat-badge ${combatActive?'pm-combat-active':'pm-combat-inactive'}" style="margin-bottom:8px">
+      ${combatActive?(isActiveTurn?'⚔ Son tour':'⚔ En combat'):'🏳 Hors combat'}
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <div style="flex:1"><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:2px"><span>PV</span><span style="font-weight:700;color:${dead?'#e53935':hpColor}">${dead?'💀':hp+'/'+hpMax}</span></div><div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:3px"></div></div></div>
+      ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;flex-shrink:0"><div style="font-size:8px;color:var(--text3)">CA</div><div style="font-size:14px;font-weight:700">${p.ac}</div></div>`:''}
+    </div>
+    ${conds.length?`<div style="font-size:10px;color:var(--text2);margin-bottom:6px">${conds.join(' ')}</div>`:''}
+    ${chargesHtml?`<div style="margin-bottom:6px">${chargesHtml}</div>`:''}
+    ${statsHtml?`<details style="margin-bottom:8px"><summary style="font-size:9px;color:var(--text3);cursor:pointer;list-style:none;display:flex;align-items:center;gap:3px"><span>▶</span> Caractéristiques</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:5px">${statsHtml}</div></details>`:''}
+    <button onclick="${isOwn?`enterCampaign('${currentTableId}','${currentCampaignId}')`:`_partyMemberClick('${uid}')`}" style="width:100%;background:none;border:1px solid rgba(200,168,75,.3);border-radius:6px;color:var(--cp);cursor:pointer;font-size:11px;padding:5px 0;font-weight:600">📋 ${isOwn?'Ma fiche':'Voir la fiche'}</button>`;
+
+  // Positionnement : à droite du panneau HUD si la place le permet, sinon au-dessus
+  const hudPanel=document.getElementById('partyHudPanel');
+  if(hudPanel){
+    const r=hudPanel.getBoundingClientRect();
+    const popW=218;
+    if(r.right+popW+12<window.innerWidth){
+      el.style.left=(r.right+8)+'px';
+      el.style.bottom=(window.innerHeight-r.bottom)+'px';
+      el.style.top='auto';
+    } else {
+      el.style.left=Math.max(8,r.left)+'px';
+      el.style.bottom=(window.innerHeight-r.top+8)+'px';
+      el.style.top='auto';
+    }
+  }
 }
 let _mjJournal=[];
 let _journalSubTab='mj';
@@ -967,7 +1023,7 @@ async function joinGroupOnly(tableId,campaignId){
 }
 function showHub(){
   stopAllListeners();
-  _groupData=[];_activeCombatState=null;_groupHudOpen=false;_groupOnlyMode=false;
+  _groupData=[];_activeCombatState=null;_groupHudOpen=false;_groupOnlyMode=false;_hideHudDetail();
   const hud=document.getElementById('partyHud');if(hud)hud.style.display='none';
   const banner=document.getElementById('combatTurnBanner');if(banner)banner.style.display='none';
   const mjBadge=document.getElementById('hubMJBadge');if(mjBadge)mjBadge.style.display='none';
