@@ -425,7 +425,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
     <span class="hub-hdr-title">🧰 La Boîte à Outils</span>
     <div class="hub-hdr-row2">
       <div id="hubMJBadge" style="display:none;align-items:center;gap:5px;padding:3px 10px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;font-size:11px;color:var(--cp);font-family:var(--F);letter-spacing:.06em">🎲 Maître de Jeu</div>
-      <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">⚔ Profil</button>
+      <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">👤 Profil</button>
       <button class="btn bsm" onclick="doLogout()" title="Déconnexion" style="color:#e53935;border-color:rgba(229,57,53,.3);padding:3px 8px;flex-shrink:0">🚪</button>
     </div>
   </div>
@@ -749,49 +749,43 @@ function openHubPlayerSheet(uid,campId){
 const _TUTO_PLAYER=[
   {icon:'🧰',title:'Bienvenue dans La Boîte à Outils !',text:'Ton compagnon numérique pour D&D 5e. Fiche de personnage, suivi de combat, sorts, inventaire, monnaie — tout en un, synchronisé en temps réel avec ton MJ.'},
   {icon:'🏠',title:'Le Hub — ta page d\'accueil',text:'C\'est d\'ici que tout part. Rejoins une campagne avec le code donné par ton MJ, ou crée ta propre table pour tester l\'outil. Toutes tes tables apparaissent ici.'},
-  {icon:'🧑',title:'Ton personnage',text:'Quand tu entres dans une campagne pour la première fois, une fiche de personnage vierge est créée automatiquement. Tu peux la remplir onglet par onglet à ton rythme.'},
-  {icon:'📥',title:'Importer un personnage',text:'Tu as déjà un personnage dans une autre campagne ? Tu peux l\'exporter en JSON depuis ta fiche (menu Profil) et l\'importer dans une nouvelle campagne pour repartir de ta fiche existante.'},
-  {icon:'📋',title:'Rejoindre une campagne',text:'Sur la carte d\'une campagne, clique sur "👥 Rejoindre le groupe" pour voir les autres participants sans entrer dans ta fiche. Ou entre directement en campagne depuis ta fiche si tu es déjà inscrit.'},
-  {icon:'🧑‍🤝‍🧑',title:'La liste des participants',text:'Chaque membre du groupe apparaît avec son portrait, son nom et sa classe. Le label "Moi" identifie ton personnage. L\'icône 📋 à droite ouvre la fiche de n\'importe quel participant.'},
-  {icon:'👤',title:'Ton profil',text:'Accède à ton profil via le bouton 👤 dans le header. Tu peux y changer ton email ou ton mot de passe, gérer tes compendiums personnalisés et revoir les guides à tout moment.'},
-  {icon:'💬',title:'Donner un retour',text:'Un bouton de feedback est disponible dans le header. Tes retours aident à améliorer l\'outil pour toute la communauté.'},
-  {icon:'👥',title:'Le menu Groupe',text:'Le bouton 👥 en bas à gauche est disponible partout (hub et fiche). Il affiche les PV, conditions et ressources de tous tes alliés en temps réel. Clique sur une carte pour voir le détail d\'un joueur.'},
-  {icon:'🔴',title:'Alertes dans le groupe',text:'Un badge rouge sur le bouton 👥 signale un allié en danger (PV < 25%). Les conditions et cooldowns de capacité s\'affichent directement sur les cartes compactes.'},
-  {icon:'⚔️',title:'Ton tour de combat',text:'Quand le MJ lance le combat, une bannière violette apparaît en haut de ta fiche quand c\'est ton tour. Clique sur ⏩ Fin de tour pour passer la main — le MJ et tes alliés le voient instantanément.'},
-  {icon:'💾',title:'Sauvegarde & Sync',text:'Tes modifications sont sauvegardées automatiquement après 3 secondes. Le point lumineux dans le header clignote lors d\'une mise à jour. Tu peux aussi cliquer 💾 manuellement à tout moment.'},
+  {icon:'🧑',title:'Rejoindre une campagne',text:'Quand tu rejoins une campagne pour la première fois, une fiche de personnage est créée automatiquement. Tu la remplis à ton rythme — nom, race, classe, stats... Un guide dédié à la fiche est disponible dans ton Profil.'},
+  {icon:'📥',title:'Importer un personnage',text:'Tous tes personnages sont sauvegardés dans ta bibliothèque, accessible depuis ton Profil. Si tu rejoins une nouvelle campagne, tu peux y importer un personnage existant en quelques clics — sans rien perdre.'},
+  {icon:'📋',title:'Menu campagne',text:'Sur la carte d\'une campagne, tu trouveras la description et la liste des membres. L\'icône 📋 à droite ouvre ta fiche ou celle de n\'importe quel participant. Clique sur "👥 Rejoindre le groupe" pour partir à l\'aventure et suivre l\'état du groupe en temps réel.'},
+  {icon:'👥',title:'Le menu Groupe',text:'Le bouton 👥 en bas à gauche est disponible partout — hub et fiche. Il affiche les PV, conditions et ressources de tous tes alliés en temps réel. Un badge rouge signale un allié en danger (PV < 25%) et les cooldowns de capacité s\'affichent directement sur chaque carte.'},
+  {icon:'👤',title:'Ton profil',text:'Accède à ton profil via le bouton 👤 en haut à droite. Tu peux y gérer tes personnages, tes compendiums et ton compte, modifier tes identifiants, et revoir les guides de La Boîte à Outils à tout moment.'},
+  {icon:'💬',title:'Donner un retour',text:'Un formulaire de feedback est accessible depuis ton Profil. Retours, questions, bugs, idées — tout est bienvenu. Tes retours aident directement à améliorer l\'outil pour toute la communauté.'},
+  {icon:'⚔️',title:'Combats',text:'Lorsque le MJ lance le combat, une bannière violette apparaît en haut de ta fiche quand c\'est ton tour. Clique sur ⏩ Fin de tour pour passer la main — le MJ et tes alliés le voient instantanément.'},
 ];
 
 // Tuto 2 — Fiche personnage, onglet par onglet
 const _TUTO_FICHE=[
   {icon:'🧑',title:'Ta fiche de personnage',text:'La fiche est ton tableau de bord en jeu. Elle est divisée en onglets pour organiser toutes tes informations. Parcourons-la ensemble onglet par onglet.',tab:null,sel:null},
-  {icon:'🧑',title:'Onglet Perso — l\'identité',text:'Nom, race, classe, niveau, portrait, background... C\'est ici que tu définis qui est ton personnage. Tu peux uploader un portrait (limité à 600 Ko) et un portrait d\'équipement.',tab:'perso',sel:'#tabBar .tab:nth-child(1)'},
-  {icon:'📊',title:'Perso — Caractéristiques & stats',text:'Les 6 caractéristiques (FOR, DEX, CON, INT, SAG, CHA) et leurs modificateurs sont calculés automatiquement. Le bonus de maîtrise s\'adapte à ton niveau total.',tab:'perso',sel:'#tabContent'},
-  {icon:'🎯',title:'Onglet Compétences',text:'Toutes tes compétences avec leurs modificateurs calculés. Coche les cases de maîtrise et expertise — les bonus s\'appliquent automatiquement. La confidentialité de cet onglet est réglable.',tab:'competences',sel:'#tabBar .tab:nth-child(2)'},
-  {icon:'⚔️',title:'Onglet Combat',text:'PV actuels et max, CA, initiative, vitesse, dés de vie. Tu peux modifier tes PV directement (soins/dégâts). Tes attaques et jets de sauvegarde sont aussi là.',tab:'combat',sel:'#tabBar .tab:nth-child(3)'},
-  {icon:'⚡',title:'Combat — Capacités de classe',text:'Tes ressources de classe (Discipline Ki, Invocations, Souffle draconique…) apparaissent ici avec leur nombre de charges restantes. Le MJ peut les voir dans son interface.',tab:'combat',sel:'#tabContent'},
-  {icon:'✨',title:'Onglet Sorts',text:'Toutes tes cases de sort par niveau, ta liste de sorts préparés. Coche un sort pour le lancer — les emplacements se déduisent automatiquement. Le compendium intègre 319 sorts SRD.',tab:'sorts',sel:'#tabBar .tab:nth-child(4)'},
+  {icon:'🧑',title:'Onglet Perso — l\'identité',text:'Nom, race, classe, niveau, portrait... C\'est ici que tu définis ton identité. Tes statistiques (FOR, DEX, CON...), tes PV, ta CA et ton initiative sont également sur cet onglet — c\'est ton tableau de bord principal.',tab:'perso',sel:'#tabBar .tab:nth-child(1)'},
+  {icon:'🎯',title:'Onglet Compétences',text:'Toutes tes compétences avec leurs modificateurs calculés. Coche les cases de maîtrise et expertise — les bonus s\'appliquent automatiquement.',tab:'competences',sel:'#tabBar .tab:nth-child(2)'},
+  {icon:'⚔️',title:'Onglet Combat',text:'Tes armes équipées avec leurs bonus d\'attaque et dégâts calculés automatiquement — un bouton lance le jet en un clic. Tes jets de sauvegarde par caractéristique sont aussi là.',tab:'combat',sel:'#tabBar .tab:nth-child(3)'},
+  {icon:'⚡',title:'Combat — Capacités de classe',text:'Tes ressources de classe (Discipline Ki, Rage, Inspiration bardique…) apparaissent ici avec leur nombre de charges restantes. Clique sur les bulles pour les dépenser, et récupère-les après un repos.',tab:'combat',sel:'#tabContent'},
+  {icon:'✨',title:'Onglet Sorts',text:'Ta liste de sorts et tes emplacements par niveau. Coche un sort pour le préparer ou le retirer. Utilise les bulles de slot pour suivre les emplacements dépensés au fil de la session.',tab:'sorts',sel:'#tabBar .tab:nth-child(4)'},
   {icon:'🛡️',title:'Onglet Équipement',text:'Tes armes et armures actives, avec un portrait d\'équipement séparé. Change d\'équipement en sélectionnant un item. La CA s\'adapte à l\'armure portée.',tab:'equipement',sel:'#tabBar .tab:nth-child(5)'},
-  {icon:'🎒',title:'Onglet Sac',text:'Ton inventaire complet. Ajoute des objets depuis le compendium (292 objets SRD) ou manuellement. Change les quantités directement. La déduplication évite les doublons.',tab:'sac',sel:'#tabBar .tab:nth-child(6)'},
-  {icon:'💰',title:'Sac — La Bourse',text:'En bas du sac, la Bourse gère tes pièces. Elle convertit automatiquement au seuil : 10 pc → 1 pa, 5 pa → 1 pe, 2 pe → 1 po, 10 po → 1 pp. Utilise Payer/Gagner pour des transactions rapides.',tab:'sac',sel:'#tabContent'},
-  {icon:'📖',title:'Onglet Historique',text:'Traits de personnalité, idéaux, liens, défauts, apparence, backstory. Tout ce qui fait la profondeur de ton personnage. Tu peux rendre cet onglet privé (le MJ y accède toujours).',tab:'historique',sel:'#tabBar .tab:nth-child(7)'},
-  {icon:'📝',title:'Onglet Journal',text:'Un journal privé pour noter tes observations, tes secrets, les infos que tu veux retenir. Seul toi y as accès — le MJ ne peut pas le lire.',tab:'journal',sel:'#tabBar .tab:nth-child(8)'},
+  {icon:'🎒',title:'Onglet Sac',text:'Ton inventaire complet. Ajoute des objets depuis le compendium ou manuellement et change les quantités directement. Cet onglet comprend aussi ta Bourse avec un système de conversion automatique des pièces.',tab:'sac',sel:'#tabBar .tab:nth-child(6)'},
+  {icon:'📖',title:'Onglet Historique',text:'Traits de personnalité, idéaux, liens, défauts, apparence, backstory — tout ce qui fait la profondeur de ton personnage. Tu peux même y ajouter des secrets uniquement visibles par le MJ.',tab:'historique',sel:'#tabBar .tab:nth-child(7)'},
+  {icon:'📝',title:'Onglet Journal',text:'Un journal pour noter tes observations, tes secrets, les infos que tu veux retenir. Choisis si tu veux partager certaines entrées en les ajoutant à la chronique du groupe.',tab:'journal',sel:'#tabBar .tab:nth-child(8)'},
   {icon:'⭐',title:'Onglet XP',text:'Ton expérience et ton niveau. Le MJ peut t\'attribuer de l\'XP directement. Quand tu passes un niveau, un onglet ⬆ Niveau + apparaît pour choisir tes améliorations.',tab:'xp',sel:'#tabBar .tab:nth-child(9)'},
-  {icon:'🔒',title:'Confidentialité',text:'Le cadenas 🔒 en bout de barre d\'onglets te permet de choisir ce que le MJ et les autres joueurs peuvent voir de ta fiche. Chaque onglet peut être rendu public ou privé.',tab:'perso',sel:'#tabBar .tab[onclick*="openPrivacySettings"]'},
-  {icon:'💾',title:'Sauvegarde',text:'Le bouton 💾 dans le header sauvegarde manuellement. Une sauvegarde automatique se déclenche après 3 secondes d\'inactivité. Le bouton brille en doré s\'il y a des modifications non sauvegardées.',tab:null,sel:'#saveBtn'},
+  {icon:'🔒',title:'Confidentialité',text:'Le cadenas 🔒 en bout de barre d\'onglets te permet de choisir les onglets que les autres joueurs peuvent voir. Chaque onglet peut être rendu public ou privé.',tab:'perso',sel:'#tabBar .tab[onclick*="openPrivacySettings"]'},
+  {icon:'💾',title:'Sauvegarde',text:'Le bouton 💾 dans le header sauvegarde tes modifications. Pense à sauvegarder régulièrement — le bouton brille en doré quand des changements n\'ont pas encore été sauvegardés. (Ce serait bête de perdre du loot)',tab:null,sel:'#saveBtn'},
 ];
 
 // Tuto 3 — Maître du Jeu
 const _TUTO_MJ=[
-  {icon:'🎲',title:'Bienvenue, Maître du Jeu !',text:'L\'interface MJ se déverrouille avec le bouton 🎲 MJ en haut de ta fiche. Elle est séparée pour garder tes infos secrètes hors de vue des joueurs.'},
-  {icon:'🏠',title:'Créer une table & une campagne',text:'Dans le Hub, crée une table. Tu obtiens un code à partager. Tu peux créer plusieurs campagnes par table, et gérer tout en parallèle. Tu es le seul à voir les options de MJ sur les cartes de campagne.'},
-  {icon:'📋',title:'Liste des participants dans le Hub',text:'Sur chaque carte de campagne, tu vois les participants avec portrait, nom et classe. L\'icône 📋 à droite ouvre leur fiche en lecture seule. Tu as accès à tous les onglets, même les privés.'},
-  {icon:'👥',title:'Menu Groupe flottant',text:'Le bouton 👥 est disponible partout — hub et interface MJ. Il affiche les PV, conditions et ressources de tous les joueurs. Clique une carte pour le détail complet avec caractéristiques.'},
-  {icon:'👤',title:'Onglet Joueurs',text:'Vois les PV, CA, initiative et conditions de chaque joueur en temps réel. Tu peux modifier leurs stats directement (soins, dégâts, ajouter/retirer des conditions) — ils voient les changements instantanément.'},
-  {icon:'⚔️',title:'Onglet Combat — indicateur',text:'L\'onglet Combat brille en violet quand un combat est en cours, et affiche un liseré doré en veille. Lance l\'initiative, ajoute joueurs et monstres. Le bouton ▶ Tour suivant notifie automatiquement le joueur concerné.'},
-  {icon:'🐉',title:'PNJ & Monstres',text:'Crée des PNJ personnalisés ou importe depuis le compendium de 322 monstres (stats, attaques, PV préremplis). Gère leurs PV et attaques depuis l\'onglet Combat.'},
+  {icon:'🏠',title:'Créer ta table — devenir MJ',text:'Tout commence dans le Hub : crée une table et tu en deviens automatiquement le Maître du Jeu. Tu obtiens un code à partager avec tes joueurs. Tu peux créer plusieurs campagnes par table et tout gérer en parallèle.'},
+  {icon:'🎲',title:'L\'interface MJ',text:'Depuis la carte de ta campagne dans le Hub, clique sur "🎲 Gérer la campagne" pour accéder à ton interface. Ce bouton n\'est visible que par toi — tes joueurs ne le voient pas.'},
+  {icon:'📋',title:'Les participants',text:'Sur chaque carte de campagne dans le Hub, tu vois les participants avec leur portrait et leur classe. L\'icône 📋 ouvre leur fiche en lecture seule — tu as accès à tous les onglets, même les privés.'},
+  {icon:'👤',title:'Onglet Joueurs',text:'Vois les PV, CA, initiative et conditions de chaque joueur en temps réel. Tu peux modifier leurs stats directement (soins, dégâts, conditions) — ils voient les changements instantanément.'},
+  {icon:'⚔️',title:'Onglet Combat',text:'L\'onglet Combat brille en violet quand un combat est en cours, et affiche un liseré doré en veille. Lance l\'initiative, ajoute joueurs et monstres. Le bouton ▶ Tour suivant notifie automatiquement le joueur concerné.'},
+  {icon:'🐉',title:'PNJ & Monstres',text:'Crée des PNJ personnalisés ou importe depuis le compendium de 322 monstres avec leurs stats préremplies. Gère leurs PV et lance leurs attaques depuis l\'onglet Combat pendant la session.'},
   {icon:'📚',title:'Onglet Règles',text:'Référence rapide en jeu : actions de combat, couverture, conditions, repos, exhaustion, magie sauvage... Consulte-la sans quitter l\'interface MJ. Plus besoin d\'ouvrir le livre.'},
-  {icon:'🧰',title:'Compendiums personnalisés',text:'Dans 👤 Profil → Mes compendiums, crée des recueils de sorts, objets ou capacités maison. Tu peux en créer plusieurs, les nommer, les exporter en JSON et les partager. Chaque table peut avoir un compendium différent.'},
-  {icon:'🔄',title:'Sync temps réel',text:'Tout est synchronisé via Firebase en temps réel. Les PV, conditions et tours de combat se propagent instantanément à tous les joueurs. Le point lumineux dans le header indique une mise à jour en cours.'},
+  {icon:'🧰',title:'Compendiums personnalisés',text:'Dans 👤 Profil → Mes compendiums, crée des recueils de sorts, objets ou capacités maison. Tu peux en créer plusieurs, les nommer, les exporter et les partager. Chaque table peut avoir un compendium différent.'},
+  {icon:'🔄',title:'Synchronisation',text:'Tout ce que tu fais est visible instantanément par tes joueurs — PV, conditions, tours de combat. Et inversement, tu vois leurs modifications en temps réel. Fini les "attends je note ça" en cours de partie.'},
 ];
 
 let _tutoIdx=0;
@@ -1098,7 +1092,7 @@ function showHub(){
   document.getElementById('mjScreen').style.display='none';
   _expandedCamp=null;
   const btn=document.getElementById('hubUserBtn');
-  if(btn&&currentUserData) btn.innerHTML=`${currentUserData.avatar||'⚔'} ${esc(currentUserData.displayName)}`;
+  if(btn&&currentUserData) btn.innerHTML=`👤 ${esc(currentUserData.displayName)}`;
   renderHub();
   if(!localStorage.getItem('tuto_player_done')) setTimeout(()=>startTutorial('player'),700);
 }
@@ -1404,7 +1398,7 @@ async function saveUserSettings(){
     currentUserData={...currentUserData,displayName:name,avatar:av};
     await currentUser.updateProfile({displayName:name});
     const btn=document.getElementById('hubUserBtn');
-    if(btn) btn.innerHTML=`${av} ${esc(name)}`;
+    if(btn) btn.innerHTML=`👤 ${esc(name)}`;
     closeModal();showToast('✅ Profil mis à jour !');
   }catch(e){showToast('❌ Erreur : '+e.message);}
 }
