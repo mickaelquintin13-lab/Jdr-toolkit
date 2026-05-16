@@ -293,7 +293,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 #partyHudBtn{width:52px;height:52px;border-radius:50%;background:var(--surface);border:2px solid var(--cp);color:var(--cp);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);transition:transform .15s;user-select:none;position:relative}
 #partyHudBtn:hover{transform:scale(1.08)}
 #partyHudBadge{position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:#e53935;border-radius:50%;border:2px solid var(--bg);font-size:9px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;display:none}
-.phud-panel{position:absolute;bottom:62px;left:0;background:rgba(10,7,3,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(200,168,75,.25);border-radius:10px;padding:8px 10px;min-width:195px;max-width:230px;box-shadow:0 8px 28px rgba(0,0,0,.6)}
+.phud-panel{position:absolute;bottom:62px;left:0;background:rgba(10,7,3,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(200,168,75,.25);border-radius:10px;padding:8px 10px;min-width:220px;max-width:270px;box-shadow:0 8px 28px rgba(0,0,0,.6)}
+.pm-combat-badge{font-size:9px;font-weight:600;padding:1px 5px;border-radius:8px;display:inline-flex;align-items:center;gap:3px;margin-top:2px}
+.pm-combat-active{color:#a78bfa;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.3);animation:combatPulse 2s ease-in-out infinite}
+.pm-combat-inactive{color:var(--text3);background:transparent}
 .party-member{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .party-member:last-child{border-bottom:none}
 .pm-portrait{width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:14px;border:1.5px solid var(--border)}
@@ -493,6 +496,7 @@ let _expandedCamp=null;
 let _unsubscribes=[];
 let _mjRenderDebounce=null;
 let _unsaved=false;
+let _suppressUnsavedMark=false;
 let _userInfoCache={};
 function stopAllListeners(){_unsubscribes.forEach(fn=>{try{fn();}catch(e){}});_unsubscribes=[];}
 window.addEventListener('beforeunload',e=>{if(_unsaved){e.preventDefault();e.returnValue='Des modifications ne sont pas sauvegardées. Quitter quand même ?';}});
@@ -553,7 +557,7 @@ function startPlayerListener(campaignId){
       // Ne re-render que si les données ont vraiment changé
       if(JSON.stringify(state.players[0])===JSON.stringify(newData))return;
       state.players[0]=newData;
-      render();
+      _suppressUnsavedMark=true;render();
       _flashSyncDot('playerSyncDot');
       showToast('🎲 Fiche mise à jour par le MJ');
     },err=>console.warn('Player sync error:',err));
@@ -625,136 +629,110 @@ function _togglePartyHud(){
   if(panel)panel.style.display=_groupHudOpen?'block':'none';
 }
 function _partyMemberClick(uid){
-  if(uid===currentUser?.uid){
-    // Son propre perso → fiche
-    _groupHudOpen=false;
-    const panel=document.getElementById('partyHudPanel');
-    if(panel)panel.style.display='none';
-    if(document.getElementById('app').style.display!=='none')setTab('perso');
-    return;
-  }
   const pp=_groupData.find(x=>x.uid===uid);
   if(!pp)return;
   openPlayerReadonlySheet(pp);
 }
 function openPlayerReadonlySheet(pp){
   const p=pp.charData||{};
-  const priv=p.privacy||{};
-  const isPublic=tab=>priv[tab]!==false;
+  openPlayerReadonlySheetFull(p,p.privacy||{},{playerName:pp.playerName,avatar:pp.avatar},false);
+}
+function openPlayerReadonlySheetFull(p,priv,playerInfo,isMJ){
+  const isPublic=tab=>isMJ||priv[tab]!==false;
   const portrait=p.portrait||p.equipPortrait;
   const cls=(p.classes||[]).map(c=>`${c.name} ${c.level||1}`).join(' / ')||'—';
+  const charName=esc(p.charName||playerInfo?.playerName||'?');
+  const STATS_SH=['FOR','DEX','CON','INT','SAG','CHA'];
 
-  // Header — toujours visible
-  const headerHtml=`
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
-      ${portrait
-        ?`<img src="${portrait}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--cp);flex-shrink:0">`
-        :`<div style="width:64px;height:64px;border-radius:50%;background:var(--surface2);border:2px solid var(--cp);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0">${pp.avatar||'⚔'}</div>`}
-      <div>
-        <div style="font-size:18px;font-weight:700;color:var(--text)">${esc(p.charName||pp.playerName||'?')}</div>
-        <div style="font-size:13px;color:var(--cp);margin:2px 0">${esc(cls)}</div>
-        <div style="font-size:12px;color:var(--text3)">${esc(p.race||'—')}${p.background?' · '+esc(p.background):''}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Joueur : ${esc(pp.playerName||'')}</div>
-      </div>
-    </div>`;
-
-  // Section combat
-  let combatHtml='';
-  if(isPublic('combat')){
-    const hp=p.hp||0;const hpMax=p.hpMax||1;
-    const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));
-    const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';
-    const conds=(p.conditions||[]);
-    const chargesHtml=_buildChargeChips(p);
-    combatHtml=`
-      <div style="margin-bottom:14px">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Combat</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:${conds.length||chargesHtml?'8px':'0'}">
-          <div style="flex:1">
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px">
-              <span>PV</span><span style="font-weight:700;color:${hp<=0?'#e53935':hpColor}">${hp<=0?'💀':hp+' / '+hpMax}</span>
-            </div>
-            <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
-              <div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:4px"></div>
-            </div>
-          </div>
-          ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex-shrink:0"><div style="font-size:9px;color:var(--text3)">CA</div><div style="font-size:18px;font-weight:700;color:var(--text)">${p.ac}</div></div>`:''}
-        </div>
-        ${conds.length?`<div style="font-size:12px;color:var(--text2);margin-bottom:6px">Conditions : ${conds.join(' ')}</div>`:''}
-        ${chargesHtml}
-      </div>`;
-  } else {
-    combatHtml=`<div style="margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3)">🔒 Combat — section privée</div>`;
-  }
-
-  // Section caractéristiques
-  let statsHtml='';
-  if(isPublic('competences')&&p.abilities){
-    const STATS=['FOR','DEX','CON','INT','SAG','CHA'];
-    statsHtml=`
-      <div style="margin-bottom:14px">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Caractéristiques</div>
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px">
-          ${STATS.map((s,i)=>{const v=p.abilities[i]||10;const mod=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 3px"><div style="font-size:9px;color:var(--text3);font-weight:600">${s}</div><div style="font-size:15px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:10px;color:var(--cp)">${mod>=0?'+':''}${mod}</div></div>`;}).join('')}
-        </div>
-      </div>`;
-  } else if(!isPublic('competences')){
-    statsHtml=`<div style="margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3)">🔒 Caractéristiques — section privée</div>`;
-  }
-
-  // Section sorts
-  let sortsHtml='';
-  if(isPublic('sorts')){
-    const prepared=(p.spells||[]).filter(s=>s.prepared).slice(0,16);
-    if(prepared.length){
-      sortsHtml=`
-        <div style="margin-bottom:14px">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Sorts préparés</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            ${prepared.map(s=>`<span style="font-size:11px;padding:2px 7px;border-radius:10px;border:1px solid var(--border);color:var(--text2)">${esc(s.name)}</span>`).join('')}
-          </div>
-        </div>`;
-    }
-  } else {
-    sortsHtml=`<div style="margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3)">🔒 Sorts — section privée</div>`;
-  }
-
-  // Section équipement porté
-  let equipHtml='';
-  if(isPublic('equipement')){
-    const eq=p.equip||{};
-    const slots=[{label:'Torse',val:eq.chest},{label:'Main principale',val:eq.mainhand},{label:'Main secondaire',val:eq.offhand},{label:'Distance',val:eq.ranged}].filter(x=>x.val);
-    if(slots.length){
-      equipHtml=`
-        <div style="margin-bottom:14px">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Équipement porté</div>
-          ${slots.map(s=>`<div style="display:flex;gap:8px;font-size:12px;margin-bottom:4px"><span style="color:var(--text3);min-width:120px">${s.label}</span><span style="color:var(--text)">${esc(s.val)}</span></div>`).join('')}
-        </div>`;
-    }
-  } else {
-    equipHtml=`<div style="margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3)">🔒 Équipement — section privée</div>`;
-  }
-
-  // Section personnalité (sans défauts ni secrets)
-  let histHtml='';
-  if(isPublic('historique')){
-    const rows=[{label:'Traits de personnalité',val:p.traits},{label:'Idéaux',val:p.ideals},{label:'Liens',val:p.bonds}].filter(x=>x.val);
-    if(rows.length){
-      histHtml=`
-        <div style="margin-bottom:14px">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Personnalité</div>
-          ${rows.map(r=>`<div style="margin-bottom:6px"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">${r.label}</div><div style="font-size:12px;color:var(--text2)">${esc(r.val)}</div></div>`).join('')}
-        </div>`;
-    }
-  } else {
-    histHtml=`<div style="margin-bottom:10px;padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3)">🔒 Personnalité — section privée</div>`;
-  }
-
-  openWideModal(`
-    <div style="max-height:72vh;overflow-y:auto;padding-right:2px">
-      ${headerHtml}${combatHtml}${statsHtml}${sortsHtml}${equipHtml}${histHtml}
+  // Onglet Perso
+  const persoContent=isPublic('perso')?`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Race</div><div style="font-size:13px">${esc(p.race||'—')}</div></div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Historique</div><div style="font-size:13px">${esc(p.background||'—')}</div></div>
+      ${p.alignment?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Alignement</div><div style="font-size:13px">${esc(p.alignment)}</div></div>`:''}
+      ${p.speed?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Vitesse</div><div style="font-size:13px">${p.speed} m</div></div>`:''}
     </div>
-    <button class="btn" style="width:100%;margin-top:10px" onclick="closeModal()">Fermer</button>`);
+    ${isPublic('competences')&&p.abilities?`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Caractéristiques</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:14px">
+      ${STATS_SH.map((s,i)=>{const v=p.abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 3px"><div style="font-size:9px;color:var(--text3);font-weight:600">${s}</div><div style="font-size:18px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:11px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join('')}
+    </div>`:''}
+    ${!isPublic('competences')?`<div style="padding:8px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3);margin-bottom:12px">🔒 Caractéristiques — section privée</div>`:''}
+  `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Perso — privée</div>`;
+
+  // Onglet Combat
+  const combatContent=isPublic('combat')?`
+    ${(()=>{const hp=p.hp||0;const hpMax=p.hpMax||1;const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';const conds=p.conditions||[];const charges=_buildChargeChips(p);
+    return`<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:14px">
+      <div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px"><span>Points de vie</span><span style="font-weight:700;color:${hp<=0?'#e53935':hpColor}">${hp<=0?'💀 Mort':hp+' / '+hpMax}</span></div>
+      <div style="height:10px;background:var(--surface2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:5px"></div></div></div>
+      ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 14px"><div style="font-size:10px;color:var(--text3)">CA</div><div style="font-size:22px;font-weight:700">${p.ac}</div></div>`:''}
+    </div>
+    ${conds.length?`<div style="margin-bottom:12px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Conditions</div><div style="display:flex;flex-wrap:wrap;gap:5px">${conds.map(c=>`<span class="status-badge malus">⚠ ${esc(c)}</span>`).join('')}</div></div>`:''}
+    ${charges?`<div style="margin-bottom:12px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Capacités</div>${charges}</div>`:''}`;})()}
+  `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Combat — privée</div>`;
+
+  // Onglet Sorts
+  const spells=p.spells||[];
+  const sortsContent=isPublic('sorts')?(spells.length?
+    [0,1,2,3,4,5,6,7,8,9].map(lvl=>{const ls=spells.filter(s=>s.level===lvl);if(!ls.length)return'';return`<div style="margin-bottom:12px"><div style="font-size:11px;color:var(--text3);margin-bottom:5px">${lvl===0?'Sorts mineurs':'Niveau '+lvl}</div><div style="display:flex;flex-wrap:wrap;gap:4px">${ls.map(s=>`<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid ${s.prepared?'rgba(200,168,75,.4)':'var(--border)'};color:${s.prepared?'var(--cp)':'var(--text2)'}">${esc(s.name)}</span>`).join('')}</div></div>`;}).join('')
+    :`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucun sort connu.</div>`)
+    :`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Sorts — privée</div>`;
+
+  // Onglet Équipement
+  const equipContent=isPublic('equipement')?`
+    ${(()=>{const eq=p.equip||{};const worn=[{k:'chest',l:'Torse'},{k:'mainhand',l:'Main principale'},{k:'offhand',l:'Main secondaire'},{k:'ranged',l:'Distance'}].filter(s=>eq[s.k]);
+    return worn.length?`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Équipement porté</div>${worn.map(s=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><span style="color:var(--text3);min-width:130px;font-size:11px">${s.l}</span><span>${esc(eq[s.k])}</span></div>`).join('')}`:`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucun équipement porté.</div>`;})()}
+  `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Équipement — privée</div>`;
+
+  // Onglet Sac
+  const sacContent=isPublic('sac')?`
+    ${(()=>{const inv=p.inventory||[];const cur=p.currency||{};
+    const curLine=[{k:'pp',l:'pp'},{k:'po',l:'po'},{k:'pe',l:'pe'},{k:'pa',l:'pa'},{k:'pc',l:'pc'}].filter(x=>cur[x.k]>0).map(x=>`<span style="font-size:12px;padding:3px 9px;border-radius:10px;border:1px solid var(--border);color:var(--cp)">${cur[x.k]} ${x.l}</span>`).join('');
+    return`${curLine?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${curLine}</div>`:''}${inv.length?`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Inventaire</div>${inv.map(item=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><span>${esc(item.name||item)}</span>${item.qty!==undefined?`<span style="color:var(--text3)">×${item.qty}</span>`:''}</div>`).join('')}`:`<div style="font-size:12px;color:var(--text3);font-style:italic">Sac vide.</div>`}`;})()}
+  `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Sac — privée</div>`;
+
+  // Onglet Historique
+  const histContent=isPublic('historique')?`
+    ${[{l:'Traits',v:p.traits},{l:'Idéaux',v:p.ideals},{l:'Liens',v:p.bonds},{l:'Langues',v:p.languages},{l:'Backstory',v:p.backstory}].filter(x=>x.v).map(x=>`<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${x.l}</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.55">${esc(x.v)}</div></div>`).join('')||`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucune info.</div>`}
+  `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Historique — privée</div>`;
+
+  const tabs=[{id:'perso',l:'Perso',c:persoContent},{id:'combat',l:'Combat',c:combatContent},{id:'sorts',l:'Sorts',c:sortsContent},{id:'equipement',l:'Équip.',c:equipContent},{id:'sac',l:'Sac',c:sacContent},{id:'historique',l:'Hist.',c:histContent}];
+  const first=tabs[0].id;
+
+  const el=document.createElement('div');
+  el.id='roSheetOverlay';
+  el.style.cssText='position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.8);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:12px 8px';
+  el.innerHTML=`<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;width:100%;max-width:600px;display:flex;flex-direction:column;min-height:70vh">
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0">
+      ${portrait?`<img src="${portrait}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--cp);flex-shrink:0">`:`<div style="width:52px;height:52px;border-radius:50%;background:var(--surface2);border:2px solid var(--cp);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">${playerInfo?.avatar||'⚔'}</div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:16px;font-weight:700;color:var(--text)">${charName}</div>
+        <div style="font-size:12px;color:var(--cp)">${esc(cls)}</div>
+        <div style="font-size:11px;color:var(--text3)">${esc(p.race||'')}${p.background?' · '+esc(p.background):''} · Joueur : ${esc(playerInfo?.playerName||'')}</div>
+      </div>
+      <button onclick="document.getElementById('roSheetOverlay')?.remove()" style="background:none;border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>
+    </div>
+    <div style="display:flex;overflow-x:auto;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)">
+      ${tabs.map(t=>`<button id="rotab_${t.id}" onclick="_roTab('${t.id}')" style="flex:1;min-width:52px;padding:9px 5px;border:none;background:none;font-size:12px;cursor:pointer;border-bottom:2px solid ${t.id===first?'var(--cp)':'transparent'};color:${t.id===first?'var(--cp)':'var(--text3)'};font-weight:${t.id===first?'700':'400'};white-space:nowrap">${t.l}</button>`).join('')}
+    </div>
+    <div style="flex:1;overflow-y:auto">
+      ${tabs.map(t=>`<div id="rocontent_${t.id}" style="padding:16px;display:${t.id===first?'block':'none'}">${t.c}</div>`).join('')}
+    </div>
+  </div>`;
+  document.getElementById('roSheetOverlay')?.remove();
+  document.body.appendChild(el);
+  el.addEventListener('click',e=>{if(e.target===el)el.remove();});
+}
+function _roTab(tabId){
+  document.querySelectorAll('[id^="rotab_"]').forEach(b=>{const t=b.id.replace('rotab_','');b.style.borderBottomColor=t===tabId?'var(--cp)':'transparent';b.style.color=t===tabId?'var(--cp)':'var(--text3)';b.style.fontWeight=t===tabId?'700':'400';});
+  document.querySelectorAll('[id^="rocontent_"]').forEach(c=>{c.style.display=c.id.replace('rocontent_','')===tabId?'block':'none';});
+}
+function openHubPlayerSheet(uid,campId){
+  let pp=null;
+  if(_hubCache){for(const t of _hubCache){if(t._campParticipants){for(const [cid,parts] of Object.entries(t._campParticipants)){if(cid===campId){pp=parts.find(x=>x.uid===uid);break;}}}if(pp)break;}}
+  if(!pp){showToast('❌ Données introuvables.');return;}
+  const isMJ=!!(currentUser&&_hubCache&&(_hubCache.find(t=>t.campaigns&&t.campaigns.some(c=>c.id===campId))?.mjId===currentUser.uid));
+  openPlayerReadonlySheetFull(pp.fullData||{},pp.priv||{},{playerName:pp.playerName,avatar:pp.avatar},isMJ);
 }
 
 // ═══════════════════════════════════════
@@ -847,10 +825,17 @@ function _updatePartyHUD(){
     badge.style.background=dangerCount?'#e53935':'transparent';
   }
 
-  const activeTurnUid=_activeCombatState?.active?_activeCombatState.currentTurnUid:null;
+  const combatActive=!!(_activeCombatState?.active);
+  const activeTurnUid=combatActive?_activeCombatState.currentTurnUid:null;
+  const STATS_SH=['FOR','DEX','CON','INT','SAG','CHA'];
+
+  const headerHtml=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08)">
+    <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">👥 Groupe</span>
+    <button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px;line-height:1" onclick="_togglePartyHud()" title="Replier">▼</button>
+  </div>`;
 
   const membersHtml=_groupData.length===0
-    ?'<div style="padding:10px;text-align:center;font-size:12px;color:var(--text3)">En attente des joueurs...</div>'
+    ?'<div style="padding:8px 0;text-align:center;font-size:12px;color:var(--text3)">En attente des joueurs...</div>'
     :_groupData.map(pp=>{
       const p=pp.charData||{};
       const hp=p.hp||0;const hpMax=p.hpMax||1;
@@ -860,39 +845,50 @@ function _updatePartyHUD(){
       const isActiveTurn=activeTurnUid&&pp.uid===activeTurnUid;
       const portrait=p.portrait||p.equipPortrait;
       const charName=p.charName||pp.playerName||'?';
-      const cls=(p.classes||[]).map(c=>c.name).join('/');
+      const cls=(p.classes||[]).map(c=>c.name+' '+c.level).join(' / ');
+      const race=p.race||'';
+      const bg=p.background||'';
+      const subLine=[cls,race?race+(bg?' · '+bg:''):bg].filter(Boolean).join(' · ');
       const conds=p.conditions||[];
       const dead=hp<=0;
-      const dimmed=activeTurnUid&&!isActiveTurn;
-      return`<div class="party-member" data-uid="${pp.uid}" style="${dimmed?'opacity:.45':''};cursor:pointer">
-        <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}">
-          ${portrait?`<img src="${portrait}">`:`<span>${pp.avatar||'⚔'}</span>`}
+      const dimmed=combatActive&&!isActiveTurn&&!isOwn;
+      const statsHtml=p.abilities?STATS_SH.map((s,i)=>{const v=p.abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px"><div style="font-size:8px;color:var(--text3)">${s}</div><div style="font-size:11px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:8px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join(''):'';
+      return`<div class="party-member" data-uid="${pp.uid}" style="${dimmed?'opacity:.4':''}">
+        <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}" style="cursor:pointer;width:34px;height:34px;align-self:flex-start;margin-top:2px" data-uid="${pp.uid}">
+          ${portrait?`<img src="${portrait}" style="width:100%;height:100%;object-fit:cover">`:`<span style="font-size:16px">${pp.avatar||'⚔'}</span>`}
         </div>
         <div style="flex:1;min-width:0">
-          <div class="pm-name${isOwn?' self':''}">${esc(charName)}${isActiveTurn?' ⚔':''}${isOwn?` <span style="font-size:9px;opacity:.6">Moi</span>`:''}</div>
-          ${cls?`<div class="pm-sub">${esc(cls)}</div>`:''}
-          <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+          <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+            <span class="pm-name${isOwn?' self':''}" style="max-width:120px">${esc(charName)}</span>
+            <span style="font-size:9px;color:${isOwn?'var(--cp)':'var(--text3)'};opacity:.8;flex-shrink:0">${isOwn?'Moi':esc(pp.playerName||'')}</span>
+          </div>
+          ${subLine?`<div class="pm-sub">${esc(subLine)}</div>`:''}
+          ${!isOwn?`<div class="pm-sub">Joueur : ${esc(pp.playerName||'')}</div>`:''}
+          <div class="pm-combat-badge ${combatActive?'pm-combat-active':'pm-combat-inactive'}">
+            ${combatActive?(isActiveTurn?'⚔ Son tour':'⚔ En combat'):'🏳 Hors combat'}
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:3px">
             <div class="pm-hp-bar" style="flex:1"><div class="pm-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
-            <span style="font-size:10px;color:${dead?'#e53935':hpColor};flex-shrink:0;font-weight:600">${dead?'💀':hp+'/'+hpMax}</span>
+            <span style="font-size:9px;color:${dead?'#e53935':hpColor};flex-shrink:0;font-weight:700">${dead?'💀':hp+'/'+hpMax}</span>
+            ${p.ac?`<span style="font-size:9px;color:var(--text3);flex-shrink:0">CA ${p.ac}</span>`:''}
           </div>
           ${conds.length?`<div class="pm-sub" style="margin-top:1px">${conds.slice(0,3).join(' ')}${conds.length>3?` <span style="opacity:.55">+${conds.length-3}</span>`:''}</div>`:''}
           ${_buildChargeChips(p)}
+          ${statsHtml?`<details style="margin-top:4px"><summary style="font-size:9px;color:var(--text3);cursor:pointer;list-style:none;display:flex;align-items:center;gap:3px"><span>▶</span> Caractéristiques</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:4px">${statsHtml}</div></details>`:''}
         </div>
+        <button data-sheet-uid="${pp.uid}" data-own="${isOwn}" style="background:none;border:1px solid rgba(200,168,75,.25);border-radius:6px;color:var(--text3);cursor:pointer;font-size:13px;padding:3px 6px;flex-shrink:0;align-self:flex-start;margin-top:2px" title="${isOwn?'Ma fiche':'Voir la fiche'}">📋</button>
       </div>`;
     }).join('');
 
-  const ficheBtn=_groupOnlyMode
-    ?`<div style="border-top:1px solid rgba(255,255,255,.08);padding-top:8px;margin-top:6px">
-        <button class="btn bsm bac" style="width:100%;font-size:11px" onclick="enterCampaign('${currentTableId}','${currentCampaignId}')">👤 Ouvrir ma fiche →</button>
-      </div>`
-    :'';
+  panel.innerHTML=headerHtml+membersHtml;
 
-  panel.innerHTML=membersHtml+ficheBtn;
-
-  // Délégation d'événement (évite les bugs d'onclick inline dans innerHTML)
   panel.onclick=e=>{
-    const m=e.target.closest('.party-member');
-    if(m&&m.dataset.uid)_partyMemberClick(m.dataset.uid);
+    if(e.target.closest('summary'))return;
+    const btn=e.target.closest('[data-sheet-uid]');
+    if(btn){
+      if(btn.dataset.own==='true')enterCampaign(currentTableId,currentCampaignId);
+      else _partyMemberClick(btn.dataset.sheetUid);
+    }
   };
 
   if(!_groupHudOpen)panel.style.display='none';
@@ -950,6 +946,9 @@ async function joinGroupOnly(tableId,campaignId){
   }
   startGroupListener(campaignId);
   if(currentTableMjId)startCombatListener(campaignId,currentTableMjId);
+  // Animation éclair sur le bouton HUD
+  const hudBtn=document.getElementById('partyHudBtn');
+  if(hudBtn){hudBtn.style.transition='box-shadow .3s';hudBtn.style.boxShadow='0 0 0 5px rgba(200,168,75,.5)';setTimeout(()=>{hudBtn.style.boxShadow='';},1200);}
 }
 function showHub(){
   stopAllListeners();
@@ -1494,11 +1493,26 @@ function renderHubHTML(tables){
         const imgHtml=c.imageUrl?`<img src="${esc(c.imageUrl)}" style="width:100%;max-height:200px;border-radius:8px;object-fit:cover;margin-bottom:10px;display:block" onload="campImgOnLoad(this)" onerror="this.style.display='none'">`:'';
         const campParticipants=t._campParticipants&&t._campParticipants[c.id]||[];
         const participantHtml=campParticipants.length?`<div style="margin-top:10px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Personnages</div>
-          ${campParticipants.map(pp=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:6px;margin-bottom:4px">
-            <span style="font-size:16px;cursor:pointer" onclick="viewCharSheet('${pp.uid}','${c.id}')">${pp.avatar||'⚔'}</span>
-            <div style="flex:1;min-width:0;cursor:pointer" onclick="viewCharSheet('${pp.uid}','${c.id}')"><div style="font-size:12px;font-weight:600">${esc(pp.charName||'?')}</div><div style="font-size:11px;color:var(--text3)">${esc(pp.charClass||'')} • ${esc(pp.playerName||'')}</div></div>
-            ${pp.uid===currentUser.uid?'<span style="font-size:10px;color:var(--cp)">Moi</span>':isMJ?`<button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.35);flex-shrink:0;font-size:10px" onclick="hubKickConfirm('${t.id}','${pp.uid}','${esc(pp.playerName||'ce joueur')}')">✕ Retirer</button>`:'<span style="font-size:10px;color:var(--cp);font-weight:600">→</span>'}
-          </div>`).join('')}
+          ${campParticipants.map(pp=>{
+            const isMe=pp.uid===currentUser.uid;
+            const fd=pp.fullData||{};
+            const pPortrait=fd.portrait||fd.equipPortrait;
+            return`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:6px;margin-bottom:4px">
+              ${pPortrait
+                ?`<img src="${pPortrait}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid ${isMe?'var(--cp)':'var(--border)'};flex-shrink:0">`
+                :`<div style="width:30px;height:30px;border-radius:50%;background:var(--surface2);border:1.5px solid ${isMe?'var(--cp)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${pp.avatar||'⚔'}</div>`}
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:4px">
+                  <span style="font-size:12px;font-weight:600;color:${isMe?'var(--cp)':'var(--text)'}">${esc(pp.charName||'?')}</span>
+                  <span style="font-size:9px;color:var(--text3)">${isMe?'Moi':esc(pp.playerName||'')}</span>
+                </div>
+                <div style="font-size:10px;color:var(--text3)">${esc(pp.charClass||'')}</div>
+              </div>
+              ${isMJ
+                ?`<button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.35);flex-shrink:0;font-size:10px;padding:2px 6px" onclick="hubKickConfirm('${t.id}','${pp.uid}','${esc(pp.playerName||'ce joueur')}')">✕</button>`
+                :`<button class="btn bsm" style="flex-shrink:0;font-size:12px;padding:2px 7px;border-color:rgba(200,168,75,.3)" title="${isMe?'Ouvrir ma fiche':'Voir la fiche'}" onclick="${isMe?`enterCampaign('${t.id}','${c.id}')`:`openHubPlayerSheet('${pp.uid}','${c.id}')`}">📋</button>`}
+            </div>`;
+          }).join('')}
         </div>`:'';
         const charBlock=isMJ
           ?`<button class="btn bac" style="width:100%;margin-top:8px;font-weight:600" onclick="enterCampaign('${t.id}','${c.id}')">🎲 Gérer la campagne</button>`
@@ -1509,10 +1523,7 @@ function renderHubHTML(tables){
                   <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${esc(charInfo.charName||'?')}</div><div style="font-size:11px;color:var(--text3)">${esc(charInfo.charClass||'')}</div></div>
                   <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.35);flex-shrink:0" onclick="playerLeaveCharacter('${c.id}')">✕ Quitter</button>
                 </div>
-                <div style="display:flex;gap:6px;border-radius:0 0 6px 6px;overflow:hidden">
-                  <button class="btn bac" style="flex:1;font-weight:600;border-radius:0" onclick="joinGroupOnly('${t.id}','${c.id}')">👥 Groupe</button>
-                  <button class="btn bac" style="flex:1;font-weight:600;border-radius:0" onclick="enterCampaign('${t.id}','${c.id}')">👤 Ma fiche</button>
-                </div>
+                <button class="btn bac" style="width:100%;font-weight:600;border-radius:0 0 6px 6px" onclick="joinGroupOnly('${t.id}','${c.id}')">👥 Rejoindre le groupe</button>
               </div>`
             :`<button class="btn bprimary" style="width:100%;margin-top:8px" onclick="openCharOrCreate('${t.id}','${c.id}')">+ Créer mon personnage</button>`);
         const mjEditHtml=isMJ?`
@@ -1965,7 +1976,7 @@ async function enterCampaign(tableId,campaignId,tName,cName,preloadedCharData){
       _groupOnlyMode=false;
       showApp();
       await loadMJPool();
-      render();
+      _suppressUnsavedMark=true;render();
       // Lance les listeners temps réel
       currentTableMjId=tableData?.mjId||null;
       stopAllListeners();
@@ -2714,7 +2725,8 @@ async function uploadEquipPortrait(input){
 // RENDER
 // ═══════════════════════════════════════
 function render(){
-  if(currentCampaignId)_markUnsaved();
+  if(currentCampaignId&&!_suppressUnsavedMark)_markUnsaved();
+  _suppressUnsavedMark=false;
   const p=P();const mc=mainClass(p);
   document.getElementById('app').className=mc?'th-'+mc.name:'';
   const hdr=document.getElementById('hdrChar');
