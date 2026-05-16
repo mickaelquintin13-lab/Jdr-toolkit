@@ -254,6 +254,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .mj-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
 .mj-tab{padding:7px 16px;border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;background:var(--surface);color:var(--text2);font-family:var(--B);transition:all .15s}
 .mj-tab.on{border-color:var(--cp);color:var(--cp);background:var(--surface2);box-shadow:0 0 8px var(--cglow)}
+.mj-tab-combat-active{border-color:rgba(167,139,250,.7)!important;color:#a78bfa!important;animation:combatPulse 2s ease-in-out infinite;background:rgba(167,139,250,.08)!important}
+.mj-tab-combat-idle{border-color:rgba(200,168,75,.3)!important;color:var(--text3)!important}
 .mj-player-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px}
 .combat-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;transition:all .15s}
 .combat-row.active-turn{border-color:var(--cp);background:var(--cglow);box-shadow:0 0 10px var(--cglow)}
@@ -288,6 +290,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .acc-body{padding:12px}
 .save-pending{animation:savePulse 1.4s ease-in-out infinite;border-color:var(--cp)!important;color:var(--cp)!important;background:rgba(200,168,75,.12)!important}
 @keyframes savePulse{0%,100%{box-shadow:0 0 0 0 rgba(200,168,75,.5)}50%{box-shadow:0 0 0 5px rgba(200,168,75,0)}}
+.tuto-highlight{outline:2px solid var(--cp)!important;outline-offset:3px;box-shadow:0 0 0 5px rgba(200,168,75,.25),0 0 16px rgba(200,168,75,.15)!important;animation:tutoGlow 1.6s ease-in-out infinite;position:relative;z-index:500}
+@keyframes tutoGlow{0%,100%{box-shadow:0 0 0 3px rgba(200,168,75,.3),0 0 10px rgba(200,168,75,.1)}50%{box-shadow:0 0 0 7px rgba(200,168,75,.15),0 0 24px rgba(200,168,75,.25)}}
 /* ===== PARTY HUD ===== */
 #partyHud{position:fixed;bottom:24px;left:24px;z-index:850;display:none}
 #partyHudBtn{width:52px;height:52px;border-radius:50%;background:var(--surface);border:2px solid var(--cp);color:var(--cp);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);transition:transform .15s;user-select:none;position:relative}
@@ -740,26 +744,72 @@ function openHubPlayerSheet(uid,campId){
 // ═══════════════════════════════════════
 // TUTO GUIDÉ
 // ═══════════════════════════════════════
+
+// Tuto 1 — Joueur (hub, profil, groupe, campagne)
 const _TUTO_PLAYER=[
-  {icon:'🧰',title:'Bienvenue dans La Boîte à Outils !',text:'Ton compagnon numérique pour jouer à D&D 5e. Fiche de personnage, suivi de combat, sorts, inventaire, monnaie — tout en un, synchronisé en temps réel avec ton MJ.'},
-  {icon:'🏠',title:'Le Hub',text:'C\'est ta page d\'accueil. Ton MJ te donne un code de table — saisis-le pour rejoindre sa campagne. Tu peux aussi créer une table pour jouer seul ou tester l\'outil.'},
-  {icon:'🧑',title:'La fiche de personnage',text:'Une fois en campagne, tu accèdes à ta fiche. Plusieurs onglets : Perso (stats, caractéristiques), Combat, Sorts, Équipement, Sac, Journal... Tu peux naviguer librement entre eux.'},
-  {icon:'⚔️',title:'En combat',text:'Quand le MJ lance le combat, une bannière violette apparaît en haut quand c\'est ton tour. Clique sur ⏩ Fin de tour pour passer la main — le MJ et les autres joueurs le voient instantanément.'},
-  {icon:'🎒',title:'Sac & Bourse',text:'Ajoute des objets depuis le compendium ou manuellement. La Bourse convertit tes pièces automatiquement (10 pc → 1 pa, 5 pa → 1 pe, etc.). Change les quantités directement dans la liste.'},
-  {icon:'👥',title:'Le groupe',text:'Le bouton 👥 en bas à gauche affiche les PV de tes compagnons en temps réel. Un badge rouge signale un allié en danger. Clique sur un portrait pour voir ses stats, ou sur "Moi" pour retourner à ta fiche.'},
-  {icon:'💾',title:'Sauvegarde & Sync',text:'Tes modifications sont sauvegardées automatiquement après 3 secondes. Le point lumineux dans le header clignote lors d\'une mise à jour avec le serveur. Tu peux aussi cliquer 💾 manuellement à tout moment.'},
+  {icon:'🧰',title:'Bienvenue dans La Boîte à Outils !',text:'Ton compagnon numérique pour D&D 5e. Fiche de personnage, suivi de combat, sorts, inventaire, monnaie — tout en un, synchronisé en temps réel avec ton MJ.'},
+  {icon:'🏠',title:'Le Hub — ta page d\'accueil',text:'C\'est d\'ici que tout part. Rejoins une campagne avec le code donné par ton MJ, ou crée ta propre table pour tester l\'outil. Toutes tes tables apparaissent ici.'},
+  {icon:'🧑',title:'Ton personnage',text:'Quand tu entres dans une campagne pour la première fois, une fiche de personnage vierge est créée automatiquement. Tu peux la remplir onglet par onglet à ton rythme.'},
+  {icon:'📥',title:'Importer un personnage',text:'Tu as déjà un personnage dans une autre campagne ? Tu peux l\'exporter en JSON depuis ta fiche (menu Profil) et l\'importer dans une nouvelle campagne pour repartir de ta fiche existante.'},
+  {icon:'📋',title:'Rejoindre une campagne',text:'Sur la carte d\'une campagne, clique sur "👥 Rejoindre le groupe" pour voir les autres participants sans entrer dans ta fiche. Ou entre directement en campagne depuis ta fiche si tu es déjà inscrit.'},
+  {icon:'🧑‍🤝‍🧑',title:'La liste des participants',text:'Chaque membre du groupe apparaît avec son portrait, son nom et sa classe. Le label "Moi" identifie ton personnage. L\'icône 📋 à droite ouvre la fiche de n\'importe quel participant.'},
+  {icon:'👤',title:'Ton profil',text:'Accède à ton profil via le bouton 👤 dans le header. Tu peux y changer ton email ou ton mot de passe, gérer tes compendiums personnalisés et revoir les guides à tout moment.'},
+  {icon:'💬',title:'Donner un retour',text:'Un bouton de feedback est disponible dans le header. Tes retours aident à améliorer l\'outil pour toute la communauté.'},
+  {icon:'👥',title:'Le menu Groupe',text:'Le bouton 👥 en bas à gauche est disponible partout (hub et fiche). Il affiche les PV, conditions et ressources de tous tes alliés en temps réel. Clique sur une carte pour voir le détail d\'un joueur.'},
+  {icon:'🔴',title:'Alertes dans le groupe',text:'Un badge rouge sur le bouton 👥 signale un allié en danger (PV < 25%). Les conditions et cooldowns de capacité s\'affichent directement sur les cartes compactes.'},
+  {icon:'⚔️',title:'Ton tour de combat',text:'Quand le MJ lance le combat, une bannière violette apparaît en haut de ta fiche quand c\'est ton tour. Clique sur ⏩ Fin de tour pour passer la main — le MJ et tes alliés le voient instantanément.'},
+  {icon:'💾',title:'Sauvegarde & Sync',text:'Tes modifications sont sauvegardées automatiquement après 3 secondes. Le point lumineux dans le header clignote lors d\'une mise à jour. Tu peux aussi cliquer 💾 manuellement à tout moment.'},
 ];
+
+// Tuto 2 — Fiche personnage, onglet par onglet
+const _TUTO_FICHE=[
+  {icon:'🧑',title:'Ta fiche de personnage',text:'La fiche est ton tableau de bord en jeu. Elle est divisée en onglets pour organiser toutes tes informations. Parcourons-la ensemble onglet par onglet.',tab:null,sel:null},
+  {icon:'🧑',title:'Onglet Perso — l\'identité',text:'Nom, race, classe, niveau, portrait, background... C\'est ici que tu définis qui est ton personnage. Tu peux uploader un portrait (limité à 600 Ko) et un portrait d\'équipement.',tab:'perso',sel:'#tabBar .tab:nth-child(1)'},
+  {icon:'📊',title:'Perso — Caractéristiques & stats',text:'Les 6 caractéristiques (FOR, DEX, CON, INT, SAG, CHA) et leurs modificateurs sont calculés automatiquement. Le bonus de maîtrise s\'adapte à ton niveau total.',tab:'perso',sel:'#tabContent'},
+  {icon:'🎯',title:'Onglet Compétences',text:'Toutes tes compétences avec leurs modificateurs calculés. Coche les cases de maîtrise et expertise — les bonus s\'appliquent automatiquement. La confidentialité de cet onglet est réglable.',tab:'competences',sel:'#tabBar .tab:nth-child(2)'},
+  {icon:'⚔️',title:'Onglet Combat',text:'PV actuels et max, CA, initiative, vitesse, dés de vie. Tu peux modifier tes PV directement (soins/dégâts). Tes attaques et jets de sauvegarde sont aussi là.',tab:'combat',sel:'#tabBar .tab:nth-child(3)'},
+  {icon:'⚡',title:'Combat — Capacités de classe',text:'Tes ressources de classe (Discipline Ki, Invocations, Souffle draconique…) apparaissent ici avec leur nombre de charges restantes. Le MJ peut les voir dans son interface.',tab:'combat',sel:'#tabContent'},
+  {icon:'✨',title:'Onglet Sorts',text:'Toutes tes cases de sort par niveau, ta liste de sorts préparés. Coche un sort pour le lancer — les emplacements se déduisent automatiquement. Le compendium intègre 319 sorts SRD.',tab:'sorts',sel:'#tabBar .tab:nth-child(4)'},
+  {icon:'🛡️',title:'Onglet Équipement',text:'Tes armes et armures actives, avec un portrait d\'équipement séparé. Change d\'équipement en sélectionnant un item. La CA s\'adapte à l\'armure portée.',tab:'equipement',sel:'#tabBar .tab:nth-child(5)'},
+  {icon:'🎒',title:'Onglet Sac',text:'Ton inventaire complet. Ajoute des objets depuis le compendium (292 objets SRD) ou manuellement. Change les quantités directement. La déduplication évite les doublons.',tab:'sac',sel:'#tabBar .tab:nth-child(6)'},
+  {icon:'💰',title:'Sac — La Bourse',text:'En bas du sac, la Bourse gère tes pièces. Elle convertit automatiquement au seuil : 10 pc → 1 pa, 5 pa → 1 pe, 2 pe → 1 po, 10 po → 1 pp. Utilise Payer/Gagner pour des transactions rapides.',tab:'sac',sel:'#tabContent'},
+  {icon:'📖',title:'Onglet Historique',text:'Traits de personnalité, idéaux, liens, défauts, apparence, backstory. Tout ce qui fait la profondeur de ton personnage. Tu peux rendre cet onglet privé (le MJ y accède toujours).',tab:'historique',sel:'#tabBar .tab:nth-child(7)'},
+  {icon:'📝',title:'Onglet Journal',text:'Un journal privé pour noter tes observations, tes secrets, les infos que tu veux retenir. Seul toi y as accès — le MJ ne peut pas le lire.',tab:'journal',sel:'#tabBar .tab:nth-child(8)'},
+  {icon:'⭐',title:'Onglet XP',text:'Ton expérience et ton niveau. Le MJ peut t\'attribuer de l\'XP directement. Quand tu passes un niveau, un onglet ⬆ Niveau + apparaît pour choisir tes améliorations.',tab:'xp',sel:'#tabBar .tab:nth-child(9)'},
+  {icon:'🔒',title:'Confidentialité',text:'Le cadenas 🔒 en bout de barre d\'onglets te permet de choisir ce que le MJ et les autres joueurs peuvent voir de ta fiche. Chaque onglet peut être rendu public ou privé.',tab:'perso',sel:'#tabBar .tab[onclick*="openPrivacySettings"]'},
+  {icon:'💾',title:'Sauvegarde',text:'Le bouton 💾 dans le header sauvegarde manuellement. Une sauvegarde automatique se déclenche après 3 secondes d\'inactivité. Le bouton brille en doré s\'il y a des modifications non sauvegardées.',tab:null,sel:'#saveBtn'},
+];
+
+// Tuto 3 — Maître du Jeu
 const _TUTO_MJ=[
-  {icon:'🎲',title:'Bienvenue, Maître du Jeu !',text:'L\'interface MJ se déverrouille avec le bouton 🎲 MJ en haut de la fiche. Elle est séparée pour ne pas mélanger tes infos secrètes avec celles des joueurs.'},
-  {icon:'🏠',title:'Créer une table',text:'Dans le Hub, crée une table. Tu obtiens un code à partager avec tes joueurs. Chaque table peut accueillir plusieurs campagnes, et tu peux en gérer plusieurs en parallèle.'},
-  {icon:'👥',title:'Onglet Joueurs',text:'Vois les PV, CA, initiative, conditions et notes secrètes de chaque joueur en temps réel. Tu peux modifier leurs stats directement (soins, dégâts, conditions) — ils voient les changements instantanément.'},
-  {icon:'⚔️',title:'Onglet Combat',text:'Lance l\'initiative (dé automatique ou manuel), ajoute des joueurs et des monstres. Le bouton ▶ Tour suivant notifie automatiquement le joueur concerné avec une bannière sur son écran.'},
-  {icon:'🐉',title:'PNJ & Monstres',text:'Crée des PNJ personnalisés ou importe directement depuis le compendium de 322 monstres (stats, attaques, PV préremplis). Gère leurs PV et attaques pendant la session depuis l\'onglet Combat.'},
-  {icon:'📚',title:'Page Règles',text:'Référence rapide en jeu : actions de combat, couverture, conditions, repos, exhaustion, magie sauvage... Sections réorganisables par glisser-déposer. Plus besoin de chercher dans le livre.'},
-  {icon:'🧰',title:'Compendiums personnalisés',text:'Dans ⚙ Profil → Mes compendiums, crée des recueils de sorts, objets ou capacités maison. Tu peux les partager avec ta table, les exporter et les importer. Chaque table peut en avoir un différent.'},
+  {icon:'🎲',title:'Bienvenue, Maître du Jeu !',text:'L\'interface MJ se déverrouille avec le bouton 🎲 MJ en haut de ta fiche. Elle est séparée pour garder tes infos secrètes hors de vue des joueurs.'},
+  {icon:'🏠',title:'Créer une table & une campagne',text:'Dans le Hub, crée une table. Tu obtiens un code à partager. Tu peux créer plusieurs campagnes par table, et gérer tout en parallèle. Tu es le seul à voir les options de MJ sur les cartes de campagne.'},
+  {icon:'📋',title:'Liste des participants dans le Hub',text:'Sur chaque carte de campagne, tu vois les participants avec portrait, nom et classe. L\'icône 📋 à droite ouvre leur fiche en lecture seule. Tu as accès à tous les onglets, même les privés.'},
+  {icon:'👥',title:'Menu Groupe flottant',text:'Le bouton 👥 est disponible partout — hub et interface MJ. Il affiche les PV, conditions et ressources de tous les joueurs. Clique une carte pour le détail complet avec caractéristiques.'},
+  {icon:'👤',title:'Onglet Joueurs',text:'Vois les PV, CA, initiative et conditions de chaque joueur en temps réel. Tu peux modifier leurs stats directement (soins, dégâts, ajouter/retirer des conditions) — ils voient les changements instantanément.'},
+  {icon:'⚔️',title:'Onglet Combat — indicateur',text:'L\'onglet Combat brille en violet quand un combat est en cours, et affiche un liseré doré en veille. Lance l\'initiative, ajoute joueurs et monstres. Le bouton ▶ Tour suivant notifie automatiquement le joueur concerné.'},
+  {icon:'🐉',title:'PNJ & Monstres',text:'Crée des PNJ personnalisés ou importe depuis le compendium de 322 monstres (stats, attaques, PV préremplis). Gère leurs PV et attaques depuis l\'onglet Combat.'},
+  {icon:'📚',title:'Onglet Règles',text:'Référence rapide en jeu : actions de combat, couverture, conditions, repos, exhaustion, magie sauvage... Consulte-la sans quitter l\'interface MJ. Plus besoin d\'ouvrir le livre.'},
+  {icon:'🧰',title:'Compendiums personnalisés',text:'Dans 👤 Profil → Mes compendiums, crée des recueils de sorts, objets ou capacités maison. Tu peux en créer plusieurs, les nommer, les exporter en JSON et les partager. Chaque table peut avoir un compendium différent.'},
+  {icon:'🔄',title:'Sync temps réel',text:'Tout est synchronisé via Firebase en temps réel. Les PV, conditions et tours de combat se propagent instantanément à tous les joueurs. Le point lumineux dans le header indique une mise à jour en cours.'},
 ];
+
 let _tutoIdx=0;
 let _tutoType='player';
+let _tutoHighlightEl=null;
+
+function _tutoApplyHighlight(sel){
+  _tutoRemoveHighlight();
+  if(!sel)return;
+  const el=document.querySelector(sel);
+  if(!el)return;
+  _tutoHighlightEl=el;
+  el.classList.add('tuto-highlight');
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function _tutoRemoveHighlight(){
+  if(_tutoHighlightEl){_tutoHighlightEl.classList.remove('tuto-highlight');_tutoHighlightEl=null;}
+}
 
 function startTutorial(type){
   _tutoType=type||'player';
@@ -767,16 +817,22 @@ function startTutorial(type){
   _renderTutoStep();
 }
 function _renderTutoStep(){
-  const steps=_tutoType==='mj'?_TUTO_MJ:_TUTO_PLAYER;
+  const steps=_tutoType==='mj'?_TUTO_MJ:(_tutoType==='fiche'?_TUTO_FICHE:_TUTO_PLAYER);
   const s=steps[_tutoIdx];
   const total=steps.length;
   const isLast=_tutoIdx===total-1;
-  const dots=Array.from({length:total},(_,i)=>`<div style="width:8px;height:8px;border-radius:50%;background:${i===_tutoIdx?'var(--cp)':'var(--surface2)'};border:1px solid ${i===_tutoIdx?'var(--cp)':'var(--border)'};transition:background .2s"></div>`).join('');
+  // Navigate to tab if step specifies one (fiche tuto)
+  if(s.tab&&typeof setTab==='function'){
+    try{if(document.getElementById('tabBar'))setTab(s.tab);}catch(e){}
+  }
+  // Apply highlight after a brief delay (let tab render)
+  setTimeout(()=>_tutoApplyHighlight(s.sel),150);
+  const dots=Array.from({length:total},(_,i)=>`<div style="width:7px;height:7px;border-radius:50%;background:${i===_tutoIdx?'var(--cp)':'var(--surface2)'};border:1px solid ${i===_tutoIdx?'var(--cp)':'var(--border)'};transition:background .2s;flex-shrink:0"></div>`).join('');
   openModal(`
-    <div style="display:flex;justify-content:center;gap:6px;margin-bottom:18px">${dots}</div>
-    <div style="text-align:center;font-size:52px;margin-bottom:12px;line-height:1">${s.icon}</div>
-    <div style="text-align:center;font-size:16px;font-weight:700;color:var(--text);margin-bottom:10px">${s.title}</div>
-    <p style="text-align:center;font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:22px">${s.text}</p>
+    <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:5px;margin-bottom:16px">${dots}</div>
+    <div style="text-align:center;font-size:44px;margin-bottom:10px;line-height:1">${s.icon}</div>
+    <div style="text-align:center;font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">${s.title}</div>
+    <p style="text-align:center;font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:20px">${s.text}</p>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       ${_tutoIdx>0?`<button class="btn" style="flex:1" onclick="_tutoIdx--;_renderTutoStep()">← Préc.</button>`:''}
       <button class="btn bac" style="flex:2" onclick="${isLast?'_tutoFinish()':'_tutoIdx++;_renderTutoStep()'}">
@@ -788,8 +844,10 @@ function _renderTutoStep(){
     </div>`);
 }
 function _tutoFinish(){
+  _tutoRemoveHighlight();
   closeModal();
-  localStorage.setItem(_tutoType==='mj'?'tuto_mj_done':'tuto_player_done','1');
+  const key=_tutoType==='mj'?'tuto_mj_done':(_tutoType==='fiche'?'tuto_fiche_done':'tuto_player_done');
+  localStorage.setItem(key,'1');
 }
 
 function _buildChargeChips(p){
@@ -893,8 +951,8 @@ function _updatePartyHUD(){
 }
 function _hideHudDetail(){
   _currentHudDetailUid=null;
-  const el=document.getElementById('hudDetailPopup');
-  if(el)el.remove();
+  document.getElementById('hudDetailPopup')?.remove();
+  document.getElementById('hudDetailOverlay')?.remove();
 }
 function _showHudDetail(uid){
   const pp=_groupData.find(x=>x.uid===uid);
@@ -917,51 +975,58 @@ function _showHudDetail(uid){
   const statsHtml=p.abilities?STATS_SH.map((s,i)=>{const v=p.abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px"><div style="font-size:8px;color:var(--text3)">${s}</div><div style="font-size:12px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:8px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join(''):'';
   const chargesHtml=_buildChargeChips(p);
 
-  let el=document.getElementById('hudDetailPopup');
-  if(!el){
-    el=document.createElement('div');
-    el.id='hudDetailPopup';
-    el.style.cssText='position:fixed;z-index:851;background:rgba(10,7,3,.96);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(200,168,75,.3);border-radius:10px;padding:10px 12px;width:210px;box-shadow:0 8px 28px rgba(0,0,0,.65)';
-    document.body.appendChild(el);
-  }
+  // Mode : overlay (hub/mj/group-only) ou flottant (fiche perso ouverte)
+  const onCharSheet=document.getElementById('app').style.display!=='none';
 
-  el.innerHTML=`
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)">
-      ${portrait?`<img src="${portrait}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--cp);flex-shrink:0">`:`<div style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--cp);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${pp.avatar||'⚔'}</div>`}
+  const innerHtml=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">
+      ${portrait?`<img src="${portrait}" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--cp);flex-shrink:0">`:`<div style="width:42px;height:42px;border-radius:50%;background:var(--surface2);border:2px solid var(--cp);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${pp.avatar||'⚔'}</div>`}
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:700;color:${isOwn?'var(--cp)':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.charName||pp.playerName||'?')}</div>
-        <div style="font-size:9px;color:var(--text3)">${isOwn?'Moi':esc(pp.playerName||'')}</div>
+        <div style="font-size:14px;font-weight:700;color:${isOwn?'var(--cp)':'var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.charName||pp.playerName||'?')}</div>
+        <div style="font-size:10px;color:var(--text3)">${isOwn?'Moi':esc(pp.playerName||'')}</div>
       </div>
-      <button onclick="_hideHudDetail();_updatePartyHUD()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0 2px;flex-shrink:0">✕</button>
+      <button onclick="_hideHudDetail();_updatePartyHUD()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px;flex-shrink:0">✕</button>
     </div>
-    ${subLine?`<div style="font-size:10px;color:var(--text3);margin-bottom:6px">${esc(subLine)}</div>`:''}
-    ${!isOwn?`<div style="font-size:10px;color:var(--text3);margin-bottom:6px">Joueur : ${esc(pp.playerName||'')}</div>`:''}
-    <div class="pm-combat-badge ${combatActive?'pm-combat-active':'pm-combat-inactive'}" style="margin-bottom:8px">
+    ${subLine?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">${esc(subLine)}</div>`:''}
+    ${!isOwn?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Joueur : ${esc(pp.playerName||'')}</div>`:''}
+    <div class="pm-combat-badge ${combatActive?'pm-combat-active':'pm-combat-inactive'}" style="margin-bottom:10px">
       ${combatActive?(isActiveTurn?'⚔ Son tour':'⚔ En combat'):'🏳 Hors combat'}
     </div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-      <div style="flex:1"><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:2px"><span>PV</span><span style="font-weight:700;color:${dead?'#e53935':hpColor}">${dead?'💀':hp+'/'+hpMax}</span></div><div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:3px"></div></div></div>
-      ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;flex-shrink:0"><div style="font-size:8px;color:var(--text3)">CA</div><div style="font-size:14px;font-weight:700">${p.ac}</div></div>`:''}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="flex:1"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px"><span>PV</span><span style="font-weight:700;color:${dead?'#e53935':hpColor}">${dead?'💀':hp+'/'+hpMax}</span></div><div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:4px"></div></div></div>
+      ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;flex-shrink:0"><div style="font-size:8px;color:var(--text3)">CA</div><div style="font-size:16px;font-weight:700">${p.ac}</div></div>`:''}
     </div>
-    ${conds.length?`<div style="font-size:10px;color:var(--text2);margin-bottom:6px">${conds.join(' ')}</div>`:''}
-    ${chargesHtml?`<div style="margin-bottom:6px">${chargesHtml}</div>`:''}
-    ${statsHtml?`<details style="margin-bottom:8px"><summary style="font-size:9px;color:var(--text3);cursor:pointer;list-style:none;display:flex;align-items:center;gap:3px"><span>▶</span> Caractéristiques</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:5px">${statsHtml}</div></details>`:''}
-    <button onclick="${isOwn?`enterCampaign('${currentTableId}','${currentCampaignId}')`:`_partyMemberClick('${uid}')`}" style="width:100%;background:none;border:1px solid rgba(200,168,75,.3);border-radius:6px;color:var(--cp);cursor:pointer;font-size:11px;padding:5px 0;font-weight:600">📋 ${isOwn?'Ma fiche':'Voir la fiche'}</button>`;
+    ${conds.length?`<div style="font-size:11px;color:var(--text2);margin-bottom:8px">${conds.join(' ')}</div>`:''}
+    ${chargesHtml?`<div style="margin-bottom:8px">${chargesHtml}</div>`:''}
+    ${statsHtml?`<details style="margin-bottom:10px"><summary style="font-size:10px;color:var(--text3);cursor:pointer;list-style:none;display:flex;align-items:center;gap:3px"><span>▶</span> Caractéristiques</summary><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:6px">${statsHtml}</div></details>`:''}
+    <button onclick="${isOwn?`enterCampaign('${currentTableId}','${currentCampaignId}')`:`_partyMemberClick('${uid}')`}" style="width:100%;background:none;border:1px solid rgba(200,168,75,.3);border-radius:8px;color:var(--cp);cursor:pointer;font-size:12px;padding:7px 0;font-weight:600">📋 ${isOwn?'Ma fiche':'Voir la fiche'}</button>`;
 
-  // Positionnement : à droite du panneau HUD si la place le permet, sinon au-dessus
-  const hudPanel=document.getElementById('partyHudPanel');
-  if(hudPanel){
-    const r=hudPanel.getBoundingClientRect();
-    const popW=218;
-    if(r.right+popW+12<window.innerWidth){
-      el.style.left=(r.right+8)+'px';
-      el.style.bottom=(window.innerHeight-r.bottom)+'px';
-      el.style.top='auto';
-    } else {
-      el.style.left=Math.max(8,r.left)+'px';
-      el.style.bottom=(window.innerHeight-r.top+8)+'px';
-      el.style.top='auto';
+  if(onCharSheet){
+    // Petit panneau flottant à côté du HUD
+    document.getElementById('hudDetailOverlay')?.remove();
+    let el=document.getElementById('hudDetailPopup');
+    if(!el){el=document.createElement('div');el.id='hudDetailPopup';document.body.appendChild(el);}
+    el.style.cssText='position:fixed;z-index:851;background:rgba(10,7,3,.96);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(200,168,75,.3);border-radius:12px;padding:12px 14px;width:260px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.7)';
+    el.innerHTML=innerHtml;
+    const hudPanel=document.getElementById('partyHudPanel');
+    if(hudPanel){const r=hudPanel.getBoundingClientRect();if(r.right+276<window.innerWidth){el.style.left=(r.right+8)+'px';el.style.bottom=(window.innerHeight-r.bottom)+'px';}else{el.style.left=Math.max(8,r.left)+'px';el.style.bottom=(window.innerHeight-r.top+8)+'px';}el.style.top='auto';}
+  } else {
+    // Overlay plein écran (hub, mode groupe seul, écran MJ)
+    let overlay=document.getElementById('hudDetailOverlay');
+    if(!overlay){
+      overlay=document.createElement('div');
+      overlay.id='hudDetailOverlay';
+      overlay.style.cssText='position:fixed;inset:0;z-index:1050;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)';
+      overlay.addEventListener('click',e=>{if(e.target===overlay){_hideHudDetail();_updatePartyHUD();}});
+      document.body.appendChild(overlay);
     }
+    let el=document.getElementById('hudDetailPopup');
+    if(!el){el=document.createElement('div');el.id='hudDetailPopup';overlay.appendChild(el);}
+    el.style.cssText='position:fixed;z-index:1051;background:var(--bg);border:1px solid rgba(200,168,75,.3);border-radius:14px;padding:16px 18px;width:min(320px,calc(100vw - 32px));max-height:80vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.8)';
+    el.innerHTML=innerHtml;
+    // Positionné à droite du HUD ou centré si pas assez de place
+    const hudPanel=document.getElementById('partyHudPanel');
+    if(hudPanel){const r=hudPanel.getBoundingClientRect();if(r.right+336<window.innerWidth){el.style.left=(r.right+12)+'px';el.style.bottom=(window.innerHeight-r.bottom)+'px';}else{el.style.left='50%';el.style.transform='translateX(-50%)';el.style.bottom='90px';}el.style.top='auto';}
   }
 }
 let _mjJournal=[];
@@ -1035,6 +1100,7 @@ function showHub(){
   const btn=document.getElementById('hubUserBtn');
   if(btn&&currentUserData) btn.innerHTML=`${currentUserData.avatar||'⚔'} ${esc(currentUserData.displayName)}`;
   renderHub();
+  if(!localStorage.getItem('tuto_player_done')) setTimeout(()=>startTutorial('player'),700);
 }
 function showApp(){
   document.getElementById('authScreen').style.display='none';
@@ -1046,7 +1112,6 @@ function showApp(){
   if(mjBtn) mjBtn.style.display='none';
   const hdrUser=document.getElementById('hdrUser');
   if(hdrUser&&currentUserData) hdrUser.textContent=`⚔ ${currentUserData.displayName}`;
-  if(!localStorage.getItem('tuto_player_done')) setTimeout(()=>startTutorial('player'),700);
 }
 
 // ─── AUTH UI ───
@@ -1177,10 +1242,11 @@ function openUserSettings(){
     <details class="acc">
       <summary>❓ Aide & Guide</summary>
       <div class="acc-body">
-        <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Revoir le guide de démarrage pas à pas.</p>
-        <div style="display:flex;gap:6px">
-          <button class="btn bsm" style="flex:1" onclick="closeModal();startTutorial('player')">📖 Guide Joueur</button>
-          <button class="btn bsm" style="flex:1" onclick="closeModal();startTutorial('mj')">🎲 Guide MJ</button>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Revoir les guides de démarrage pas à pas.</p>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn bsm" onclick="closeModal();startTutorial('player')">📖 Guide Joueur</button>
+          <button class="btn bsm" onclick="closeModal();startTutorial('fiche')">🧑 Guide Fiche de personnage</button>
+          <button class="btn bsm" onclick="closeModal();startTutorial('mj')">🎲 Guide Maître du Jeu</button>
         </div>
       </div>
     </details>
@@ -2048,6 +2114,7 @@ async function enterCampaign(tableId,campaignId,tName,cName,preloadedCharData){
       showApp();
       await loadMJPool();
       _suppressUnsavedMark=true;render();
+      if(!localStorage.getItem('tuto_fiche_done')) setTimeout(()=>startTutorial('fiche'),800);
       // Lance les listeners temps réel
       currentTableMjId=tableData?.mjId||null;
       stopAllListeners();
@@ -5596,7 +5663,7 @@ function selectBgPerso(name){upd('background',name);const inp=document.getElemen
 function uploadPortrait(input){const file=input.files[0];if(!file)return;if(file.size>614400){showToast('❌ Image trop lourde (max 600 Ko). Compressez-la avant import.');input.value='';return;}const reader=new FileReader();reader.onload=e=>{upd('portrait',e.target.result);render();};reader.readAsDataURL(file);}
 function openModal(html){const m=document.getElementById('modal');m.className='open';m.innerHTML=`<div class="modal-box" style="max-width:480px">${html}</div>`;}
 function openWideModal(html){const m=document.getElementById('modal');m.className='open';m.innerHTML=`<div class="modal-box" style="max-width:600px">${html}</div>`;}
-function closeModal(){const m=document.getElementById('modal');if(m){m.className='';m.innerHTML='';}}
+function closeModal(){const m=document.getElementById('modal');if(m){m.className='';m.innerHTML='';}if(typeof _tutoRemoveHighlight==='function')_tutoRemoveHighlight();}
 document.addEventListener('click',e=>{
   if(document.getElementById('modal')?.className==='open'&&e.target===document.getElementById('modal'))closeModal();
   ['classeDrop','bgDropPerso','bgDropCre'].forEach(id=>{const d=document.getElementById(id);if(d&&!d.contains(e.target))d.style.display='none';});
@@ -5958,7 +6025,10 @@ function renderMJTabs(){
     {id:'regles',label:'📖 Règles'},
   ];
   const bar=document.getElementById('mjTabBar');
-  if(bar) bar.innerHTML=tabs.map(t=>`<button class="mj-tab${_mjTab===t.id?' on':''}" onclick="setMJTab('${t.id}')">${t.label}</button>`).join('');
+  if(bar) bar.innerHTML=tabs.map(t=>{
+    const combatExtra=t.id==='combat'?(_mjCombatStarted?' mj-tab-combat-active':' mj-tab-combat-idle'):'';
+    return`<button class="mj-tab${_mjTab===t.id?' on':''}${combatExtra}" onclick="setMJTab('${t.id}')">${t.label}</button>`;
+  }).join('');
   renderMJContent();
 }
 
