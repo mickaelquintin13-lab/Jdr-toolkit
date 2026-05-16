@@ -562,6 +562,7 @@ function startPlayerListener(campaignId){
 // ═══ PARTY HUD ═══
 let _groupData=[];
 let _groupHudOpen=false;
+let _groupOnlyMode=false;
 
 function startGroupListener(campaignId){
   const unsub=fbDb.collection('characters').where('campaignId','==',campaignId)
@@ -736,10 +737,9 @@ function _updatePartyHUD(){
   const btn=document.getElementById('partyHudBtn');
   const badge=document.getElementById('partyHudBadge');
   if(!hud||!panel||!btn)return;
-  if(_groupData.length<=1){hud.style.display='none';return;}
+  if(_groupData.length===0&&!_groupOnlyMode){hud.style.display='none';return;}
   hud.style.display='block';
 
-  // Badge : nombre de joueurs en danger (PV ≤ 25%)
   const dangerCount=_groupData.filter(pp=>{const p=pp.charData||{};const pct=p.hpMax?p.hp/p.hpMax:1;return pct<=.25;}).length;
   if(badge){
     badge.style.display=dangerCount?'flex':'none';
@@ -749,35 +749,50 @@ function _updatePartyHUD(){
 
   const activeTurnUid=_activeCombatState?.active?_activeCombatState.currentTurnUid:null;
 
-  panel.innerHTML=_groupData.map(pp=>{
-    const p=pp.charData||{};
-    const hp=p.hp||0;
-    const hpMax=p.hpMax||1;
-    const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));
-    const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';
-    const isOwn=pp.uid===currentUser?.uid;
-    const isActiveTurn=activeTurnUid&&pp.uid===activeTurnUid;
-    const portrait=p.portrait||p.equipPortrait;
-    const charName=p.charName||pp.playerName||'?';
-    const cls=(p.classes||[]).map(c=>c.name).join('/');
-    const conds=p.conditions||[];
-    const dead=hp<=0;
-    const dimmed=activeTurnUid&&!isActiveTurn;
-    return`<div class="party-member" style="${dimmed?'opacity:.45':''};cursor:pointer" onclick="_partyMemberClick('${pp.uid}')">
-      <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}">
-        ${portrait?`<img src="${portrait}">`:`<span>${pp.avatar||'⚔'}</span>`}
-      </div>
-      <div style="flex:1;min-width:0">
-        <div class="pm-name${isOwn?' self':''}">${esc(charName)}${isActiveTurn?' ⚔':''}${isOwn?` <span style="font-size:9px;opacity:.6">Moi</span>`:''}</div>
-        ${cls?`<div class="pm-sub">${esc(cls)}</div>`:''}
-        <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
-          <div class="pm-hp-bar" style="flex:1"><div class="pm-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
-          <span style="font-size:10px;color:${dead?'#e53935':hpColor};flex-shrink:0;font-weight:600">${dead?'💀':hp+'/'+hpMax}</span>
+  const membersHtml=_groupData.length===0
+    ?'<div style="padding:10px;text-align:center;font-size:12px;color:var(--text3)">En attente des joueurs...</div>'
+    :_groupData.map(pp=>{
+      const p=pp.charData||{};
+      const hp=p.hp||0;const hpMax=p.hpMax||1;
+      const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));
+      const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';
+      const isOwn=pp.uid===currentUser?.uid;
+      const isActiveTurn=activeTurnUid&&pp.uid===activeTurnUid;
+      const portrait=p.portrait||p.equipPortrait;
+      const charName=p.charName||pp.playerName||'?';
+      const cls=(p.classes||[]).map(c=>c.name).join('/');
+      const conds=p.conditions||[];
+      const dead=hp<=0;
+      const dimmed=activeTurnUid&&!isActiveTurn;
+      return`<div class="party-member" data-uid="${pp.uid}" style="${dimmed?'opacity:.45':''};cursor:pointer">
+        <div class="pm-portrait${isOwn?' self':''}${isActiveTurn?' active-turn-portrait':''}">
+          ${portrait?`<img src="${portrait}">`:`<span>${pp.avatar||'⚔'}</span>`}
         </div>
-        ${conds.length?`<div class="pm-sub" style="margin-top:1px">${conds.slice(0,3).join(' ')}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
+        <div style="flex:1;min-width:0">
+          <div class="pm-name${isOwn?' self':''}">${esc(charName)}${isActiveTurn?' ⚔':''}${isOwn?` <span style="font-size:9px;opacity:.6">Moi</span>`:''}</div>
+          ${cls?`<div class="pm-sub">${esc(cls)}</div>`:''}
+          <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+            <div class="pm-hp-bar" style="flex:1"><div class="pm-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+            <span style="font-size:10px;color:${dead?'#e53935':hpColor};flex-shrink:0;font-weight:600">${dead?'💀':hp+'/'+hpMax}</span>
+          </div>
+          ${conds.length?`<div class="pm-sub" style="margin-top:1px">${conds.slice(0,3).join(' ')}</div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+  const ficheBtn=_groupOnlyMode
+    ?`<div style="border-top:1px solid rgba(255,255,255,.08);padding-top:8px;margin-top:6px">
+        <button class="btn bsm bac" style="width:100%;font-size:11px" onclick="enterCampaign('${currentTableId}','${currentCampaignId}')">👤 Ouvrir ma fiche →</button>
+      </div>`
+    :'';
+
+  panel.innerHTML=membersHtml+ficheBtn;
+
+  // Délégation d'événement (évite les bugs d'onclick inline dans innerHTML)
+  panel.onclick=e=>{
+    const m=e.target.closest('.party-member');
+    if(m&&m.dataset.uid)_partyMemberClick(m.dataset.uid);
+  };
 
   if(!_groupHudOpen)panel.style.display='none';
 }
@@ -817,9 +832,27 @@ function showAuthScreen(){
   document.getElementById('hubScreen').style.display='none';
   document.getElementById('app').style.display='none';
 }
+async function joinGroupOnly(tableId,campaignId){
+  const tableData=_hubCache&&_hubCache.find(t=>t.id===tableId);
+  currentTableId=tableId;currentCampaignId=campaignId;
+  currentTableName=tableData?.name||'';currentTableMjId=tableData?.mjId||null;
+  _groupOnlyMode=true;
+  stopAllListeners();
+  _groupData=[];_activeCombatState=null;
+  _groupHudOpen=true;
+  const hud=document.getElementById('partyHud');
+  const panel=document.getElementById('partyHudPanel');
+  if(hud&&panel){
+    hud.style.display='block';
+    panel.style.display='block';
+    panel.innerHTML='<div style="padding:12px;text-align:center;color:var(--text3);font-size:12px">Connexion au groupe...</div>';
+  }
+  startGroupListener(campaignId);
+  if(currentTableMjId)startCombatListener(campaignId,currentTableMjId);
+}
 function showHub(){
   stopAllListeners();
-  _groupData=[];_activeCombatState=null;_groupHudOpen=false;
+  _groupData=[];_activeCombatState=null;_groupHudOpen=false;_groupOnlyMode=false;
   const hud=document.getElementById('partyHud');if(hud)hud.style.display='none';
   const banner=document.getElementById('combatTurnBanner');if(banner)banner.style.display='none';
   const mjBadge=document.getElementById('hubMJBadge');if(mjBadge)mjBadge.style.display='none';
@@ -1375,7 +1408,7 @@ function renderHubHTML(tables){
                   <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${esc(charInfo.charName||'?')}</div><div style="font-size:11px;color:var(--text3)">${esc(charInfo.charClass||'')}</div></div>
                   <button class="btn bsm" style="color:#e53935;border-color:rgba(229,57,53,.35);flex-shrink:0" onclick="playerLeaveCharacter('${c.id}')">✕ Quitter</button>
                 </div>
-                <button class="btn bac" style="width:100%;border-radius:0 0 6px 6px;font-weight:600" onclick="enterCampaign('${t.id}','${c.id}')">👥 Rejoindre le groupe</button>
+                <button class="btn bac" style="width:100%;border-radius:0 0 6px 6px;font-weight:600" onclick="joinGroupOnly('${t.id}','${c.id}')">👥 Rejoindre le groupe</button>
               </div>`
             :`<button class="btn bprimary" style="width:100%;margin-top:8px" onclick="openCharOrCreate('${t.id}','${c.id}')">+ Créer mon personnage</button>`);
         const mjEditHtml=isMJ?`
@@ -1825,6 +1858,7 @@ async function enterCampaign(tableId,campaignId,tName,cName,preloadedCharData){
       state.activeIdx=0;
       state.activeTab=localStorage.getItem('lastTab_'+campaignId)||'perso';
       _mjJournal=[];_journalSubTab='mj';_compilationData=null;
+      _groupOnlyMode=false;
       showApp();
       await loadMJPool();
       render();
