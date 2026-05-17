@@ -19,7 +19,7 @@
 :root{--bg:#0d0d0f;--surface:#16181d;--surface2:#1e2128;--surface3:#252830;--border:#2e3240;--text:#e8e6e0;--text2:#a8a49e;--text3:#5a5870;--cp:#c8a84b;--cglow:rgba(200,168,75,.18);--F:'Cinzel',serif;--B:'Crimson Pro',serif}
 .th-Barbare{--cp:#e05a2b;--cglow:rgba(224,90,43,.18)}.th-Barde{--cp:#9b59b6;--cglow:rgba(155,89,182,.18)}.th-Clerc{--cp:#f0c040;--cglow:rgba(240,192,64,.18)}.th-Druide{--cp:#4caf50;--cglow:rgba(76,175,80,.18)}.th-Guerrier{--cp:#e53935;--cglow:rgba(229,57,53,.18)}.th-Moine{--cp:#80cbc4;--cglow:rgba(128,203,196,.18)}.th-Paladin{--cp:#ffd54f;--cglow:rgba(255,213,79,.18)}.th-Rôdeur{--cp:#66bb6a;--cglow:rgba(102,187,106,.18)}.th-Roublard{--cp:#546e7a;--cglow:rgba(84,110,122,.18)}.th-Ensorceleur{--cp:#e91e63;--cglow:rgba(233,30,99,.18)}.th-Occultiste{--cp:#7e57c2;--cglow:rgba(126,87,194,.18)}.th-Magicien{--cp:#42a5f5;--cglow:rgba(66,165,245,.18)}.th-Artificier{--cp:#ff7043;--cglow:rgba(255,112,67,.18)}
 body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;min-height:100vh}
-#app{max-width:920px;margin:0 auto;padding:12px}
+#app{max-width:920px;margin:0 auto;padding:12px 12px 90px}
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;gap:8px}
 .hdr-title{font-family:var(--F);font-size:16px;color:var(--cp);letter-spacing:.08em}
 .hdr-char{font-size:13px;color:var(--text2);flex:1;text-align:center}
@@ -370,6 +370,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 </head>
 <body>
 
+<!-- ÉCRAN DE CHARGEMENT -->
+<div id="splashScreen" style="position:fixed;inset:0;z-index:9999;background:#0d0d0f;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s ease">
+  <div style="font-size:48px;filter:drop-shadow(0 0 20px rgba(200,168,75,.5))">🧰</div>
+  <div style="font-family:'Cinzel',serif;font-size:20px;color:#c8a84b;letter-spacing:.12em">La Boîte à Outils</div>
+  <div id="splashMsg" style="font-size:12px;color:#5a5870;letter-spacing:.04em">Chargement...</div>
+  <span class="auth-spinner" style="width:22px;height:22px;border-width:3px"></span>
+</div>
+
 <!-- ÉCRAN DE CONNEXION -->
 <div id="authScreen" class="tavern-bg" style="display:none">
   <div class="auth-box">
@@ -426,7 +434,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
     <div class="hub-hdr-row2">
       <div id="hubMJBadge" style="display:none;align-items:center;gap:5px;padding:3px 10px;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;font-size:11px;color:var(--cp);font-family:var(--F);letter-spacing:.06em">🎲 Maître de Jeu</div>
       <button class="hub-user-btn" id="hubUserBtn" onclick="openUserSettings()">👤 Profil</button>
-      <button class="btn bsm" onclick="doLogout()" title="Déconnexion" style="color:#e53935;border-color:rgba(229,57,53,.3);padding:3px 8px;flex-shrink:0">🚪</button>
     </div>
   </div>
   <div class="hub-body">
@@ -485,6 +492,42 @@ const firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 const fbAuth=firebase.auth();
 const fbDb=firebase.firestore();
+
+// ─── SPLASH + MISE À JOUR AUTO ───
+function hideSplash(){
+  const el=document.getElementById('splashScreen');
+  if(!el)return;
+  el.style.opacity='0';
+  setTimeout(()=>{if(el.parentNode)el.parentNode.removeChild(el);},500);
+}
+setTimeout(()=>{
+  const el=document.getElementById('splashScreen');
+  if(!el)return;
+  const msg=document.getElementById('splashMsg');
+  const spinner=el.querySelector('.auth-spinner');
+  if(spinner)spinner.style.display='none';
+  if(msg){msg.innerHTML='Problème de connexion<br><span style="font-size:11px;color:#5a5870">Vérifiez votre réseau et réessayez.</span>';}
+  const btn=document.createElement('button');
+  btn.textContent='↺ Réessayer';
+  btn.style.cssText='margin-top:8px;padding:8px 20px;background:none;border:1px solid #c8a84b;border-radius:6px;color:#c8a84b;font-size:13px;cursor:pointer;font-family:inherit';
+  btn.onclick=()=>location.reload();
+  el.appendChild(btn);
+},8000);
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data?.type!=='SW_UPDATED')return;
+    const splash=document.getElementById('splashScreen');
+    const msg=document.getElementById('splashMsg');
+    if(splash){
+      if(msg)msg.textContent='Mise à jour disponible — rechargement automatique...';
+      splash.style.opacity='1';splash.style.display='flex';
+      setTimeout(()=>location.reload(true),2000);
+    } else {
+      if(typeof showToast==='function')showToast('🔄 Mise à jour disponible — rechargement dans 3s...');
+      setTimeout(()=>location.reload(true),3000);
+    }
+  });
+}
 
 let currentUser=null;
 let currentUserData=null;
@@ -646,35 +689,74 @@ function openPlayerReadonlySheet(pp){
 function openPlayerReadonlySheetFull(p,priv,playerInfo,isMJ){
   const isPublic=tab=>isMJ||priv[tab]!==false;
   const portrait=p.portrait||p.equipPortrait;
+  const abilities=p.abilities||[10,10,10,10,10,10];
+  const lvl=(p.classes||[]).reduce((s,c)=>s+(c.level||1),0)||1;
+  const pb=lvl>=17?6:lvl>=13?5:lvl>=9?4:lvl>=5?3:2;
   const cls=(p.classes||[]).map(c=>`${c.name} ${c.level||1}`).join(' / ')||'—';
   const charName=esc(p.charName||playerInfo?.playerName||'?');
-  const STATS_SH=['FOR','DEX','CON','INT','SAG','CHA'];
+
+  // helpers
+  const roCell=(label,val)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">${label}</div><div style="font-size:13px">${val}</div></div>`;
+  const roSection=(label)=>`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px">${label}</div>`;
 
   // Onglet Perso
   const persoContent=isPublic('perso')?`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Race</div><div style="font-size:13px">${esc(p.race||'—')}</div></div>
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Historique</div><div style="font-size:13px">${esc(p.background||'—')}</div></div>
-      ${p.alignment?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Alignement</div><div style="font-size:13px">${esc(p.alignment)}</div></div>`:''}
-      ${p.speed?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Vitesse</div><div style="font-size:13px">${p.speed} m</div></div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+      ${roCell('Classe',esc(cls))}
+      ${roCell('Race',esc(p.race||'—'))}
+      ${roCell('Historique',esc(p.background||'—'))}
+      ${p.alignment?roCell('Alignement',esc(p.alignment)):''}
+      ${roCell('Niveau total',lvl)}
+      ${roCell('Bonus maîtrise',`+${pb}`)}
+      ${p.speed?roCell('Vitesse',p.speed+' m'):''}
     </div>
-    ${isPublic('competences')&&p.abilities?`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Caractéristiques</div>
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:14px">
-      ${STATS_SH.map((s,i)=>{const v=p.abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 3px"><div style="font-size:9px;color:var(--text3);font-weight:600">${s}</div><div style="font-size:18px;font-weight:700;color:var(--text)">${v}</div><div style="font-size:11px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join('')}
+    ${isPublic('competences')&&abilities?`${roSection('Caractéristiques')}
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:4px">
+      ${ABILITIES_SH.map((s,i)=>{const v=abilities[i]||10;const m=Math.floor((v-10)/2);return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 3px"><div style="font-size:9px;color:var(--text3);font-weight:600">${s}</div><div style="font-size:18px;font-weight:700">${v}</div><div style="font-size:11px;color:var(--cp)">${m>=0?'+':''}${m}</div></div>`;}).join('')}
     </div>`:''}
-    ${!isPublic('competences')?`<div style="padding:8px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3);margin-bottom:12px">🔒 Caractéristiques — section privée</div>`:''}
+    ${!isPublic('competences')?`<div style="padding:8px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--text3);margin-bottom:8px">🔒 Caractéristiques — section privée</div>`:''}
+    ${(()=>{
+      // Capacités & traits (race + background)
+      const traits=[];
+      if(SRD&&SRD.races){const rd=SRD.races.find(r=>r.name===p.race);if(rd&&rd.traits)rd.traits.forEach(t=>traits.push({name:t.name,source:esc(p.race||''),desc:t.desc||''}));}
+      if(SRD&&SRD.backgrounds){const bd=SRD.backgrounds.find(b=>b.name===p.background);if(bd&&bd.feature)traits.push({name:bd.feature,source:esc(p.background||''),desc:bd.featureDesc||''});}
+      if(!traits.length)return'';
+      return`${roSection('Capacités & traits')}${traits.map(t=>`<div style="margin-bottom:8px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="font-size:12px;font-weight:600;color:var(--cp)">${esc(t.name)}</div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">${t.source}</div>${t.desc?`<div style="font-size:12px;color:var(--text2);margin-top:4px">${esc(t.desc)}</div>`:''}</div>`).join('')}`;
+    })()}
+    ${(()=>{
+      const sts=p.statuses||[];if(!sts.length)return'';
+      return`${roSection('Statuts')}${sts.map(s=>`<span class="status-badge ${s.type||'malus'}" style="margin:2px">${s.icon||'◆'} ${esc(s.name)}</span>`).join('')}`;
+    })()}
   `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Perso — privée</div>`;
 
   // Onglet Combat
   const combatContent=isPublic('combat')?`
-    ${(()=>{const hp=p.hp||0;const hpMax=p.hpMax||1;const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';const conds=p.conditions||[];const charges=_buildChargeChips(p);
-    return`<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:14px">
-      <div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px"><span>Points de vie</span><span style="font-weight:700;color:${hp<=0?'#e53935':hpColor}">${hp<=0?'💀 Mort':hp+' / '+hpMax}</span></div>
-      <div style="height:10px;background:var(--surface2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:5px"></div></div></div>
-      ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 14px"><div style="font-size:10px;color:var(--text3)">CA</div><div style="font-size:22px;font-weight:700">${p.ac}</div></div>`:''}
-    </div>
-    ${conds.length?`<div style="margin-bottom:12px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Conditions</div><div style="display:flex;flex-wrap:wrap;gap:5px">${conds.map(c=>`<span class="status-badge malus">⚠ ${esc(c)}</span>`).join('')}</div></div>`:''}
-    ${charges?`<div style="margin-bottom:12px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Capacités</div>${charges}</div>`:''}`;})()}
+    ${(()=>{
+      const hp=p.hp||0;const hpMax=p.hpMax||1;const hpPct=Math.max(0,Math.min(100,hpMax?hp/hpMax*100:0));const hpColor=hpPct>50?'#4caf50':hpPct>25?'#ff9800':'#e53935';
+      const conds=p.conditions||[];const charges=_buildChargeChips(p);
+      // Armes
+      const eq=p.equip||{};const forM=Math.floor((abilities[0]-10)/2);const dexM=Math.floor((abilities[1]-10)/2);
+      const weapons=['mainhand','offhand','ranged'].map(slot=>{const it=eq[slot];return it&&it.name?{...it,slot}:null;}).filter(Boolean);
+      const weaponsHtml=weapons.length?`${roSection('Armes équipées')}${weapons.map(w=>{
+        const srdW=SRD?.weapons?.find(sw=>sw.name===w.name);
+        const finesse=srdW&&(srdW.properties||'').includes('Finesse');
+        const atkM=finesse?Math.max(forM,dexM):w.slot==='ranged'?dexM:forM;
+        const bonus=pb+atkM;
+        const slotLabel=w.slot==='mainhand'?'Main droite':w.slot==='offhand'?'Main gauche':'Distance';
+        return`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px"><div><div style="font-size:13px;font-weight:600">${esc(w.name)}</div><div style="font-size:10px;color:var(--text3)">${slotLabel}</div></div><span style="color:var(--cp);font-weight:700">${bonus>=0?'+':''}${bonus}${srdW?' / '+esc(srdW.damage):''}</span></div>`;
+      }).join('')}`:'';
+      // Sauvegardes
+      const mc=(p.classes||[])[0];const saveProfIds=mc?(CLASS_SAVES[mc.name]||[]):[];
+      const savesHtml=`${roSection('Sauvegardes')}<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:4px">${ABILITIES_SH.map((ab,i)=>{const m=Math.floor((abilities[i]-10)/2)+(saveProfIds.includes(i)?pb:0);const hasSave=saveProfIds.includes(i);return`<div style="text-align:center;background:var(--surface2);border:1px solid ${hasSave?'rgba(200,168,75,.4)':'var(--border)'};border-radius:8px;padding:6px 2px"><div style="font-size:9px;color:var(--text3);font-weight:600">${ab}</div><div style="font-size:15px;font-weight:700;color:${hasSave?'var(--cp)':'var(--text)'}">${m>=0?'+':''}${m}</div></div>`;}).join('')}</div>`;
+      return`<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:12px">
+        <div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px"><span>Points de vie</span><span style="font-weight:700;color:${hp<=0?'#e53935':hpColor}">${hp<=0?'💀 Mort':hp+' / '+hpMax}</span></div>
+        <div style="height:10px;background:var(--surface2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${hpPct}%;background:${hpColor};border-radius:5px"></div></div></div>
+        ${p.ac?`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 14px"><div style="font-size:10px;color:var(--text3)">CA</div><div style="font-size:22px;font-weight:700">${p.ac}</div></div>`:''}
+      </div>
+      ${conds.length?`<div style="margin-bottom:12px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Conditions</div><div style="display:flex;flex-wrap:wrap;gap:5px">${conds.map(c=>`<span class="status-badge malus">⚠ ${esc(c)}</span>`).join('')}</div></div>`:''}
+      ${charges?`<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Capacités</div>${charges}</div>`:''}
+      ${weaponsHtml}${savesHtml}`;
+    })()}
   `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Combat — privée</div>`;
 
   // Onglet Sorts
@@ -686,8 +768,8 @@ function openPlayerReadonlySheetFull(p,priv,playerInfo,isMJ){
 
   // Onglet Équipement
   const equipContent=isPublic('equipement')?`
-    ${(()=>{const eq=p.equip||{};const worn=[{k:'chest',l:'Torse'},{k:'mainhand',l:'Main principale'},{k:'offhand',l:'Main secondaire'},{k:'ranged',l:'Distance'}].filter(s=>eq[s.k]);
-    return worn.length?`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Équipement porté</div>${worn.map(s=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><span style="color:var(--text3);min-width:130px;font-size:11px">${s.l}</span><span>${esc(eq[s.k])}</span></div>`).join('')}`:`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucun équipement porté.</div>`;})()}
+    ${(()=>{const eq=p.equip||{};const worn=[{k:'chest',l:'Torse'},{k:'mainhand',l:'Main principale'},{k:'offhand',l:'Main secondaire'},{k:'ranged',l:'Distance'}].filter(s=>eq[s.k]&&eq[s.k].name);
+    return worn.length?`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Équipement porté</div>${worn.map(s=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px"><span style="color:var(--text3);min-width:130px;font-size:11px">${s.l}</span><span>${esc(eq[s.k].name)}</span></div>`).join('')}`:`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucun équipement porté.</div>`;})()}
   `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Équipement — privée</div>`;
 
   // Onglet Sac
@@ -699,7 +781,7 @@ function openPlayerReadonlySheetFull(p,priv,playerInfo,isMJ){
 
   // Onglet Historique
   const histContent=isPublic('historique')?`
-    ${[{l:'Traits',v:p.traits},{l:'Idéaux',v:p.ideals},{l:'Liens',v:p.bonds},{l:'Langues',v:p.languages},{l:'Backstory',v:p.backstory}].filter(x=>x.v).map(x=>`<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${x.l}</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.55">${esc(x.v)}</div></div>`).join('')||`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucune info.</div>`}
+    ${[{l:'Traits',v:p.traits},{l:'Idéaux',v:p.ideals},{l:'Liens',v:p.bonds},{l:'Défauts',v:p.flaws},{l:'Langues',v:p.languages},{l:'Backstory',v:p.backstory}].filter(x=>x.v).map(x=>`<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${x.l}</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap;line-height:1.55">${esc(x.v)}</div></div>`).join('')||`<div style="font-size:12px;color:var(--text3);font-style:italic">Aucune info.</div>`}
   `:`<div style="padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text3)">🔒 Section Historique — privée</div>`;
 
   const tabs=[{id:'perso',l:'Perso',c:persoContent},{id:'combat',l:'Combat',c:combatContent},{id:'sorts',l:'Sorts',c:sortsContent},{id:'equipement',l:'Équip.',c:equipContent},{id:'sac',l:'Sac',c:sacContent},{id:'historique',l:'Hist.',c:histContent}];
@@ -771,6 +853,7 @@ const _TUTO_FICHE=[
   {icon:'📖',title:'Onglet Historique',text:'Traits de personnalité, idéaux, liens, défauts, apparence, backstory — tout ce qui fait la profondeur de ton personnage. Tu peux même y ajouter des secrets uniquement visibles par le MJ.',tab:'historique',sel:'#tabBar .tab:nth-child(7)'},
   {icon:'📝',title:'Onglet Journal',text:'Un journal pour noter tes observations, tes secrets, les infos que tu veux retenir. Choisis si tu veux partager certaines entrées en les ajoutant à la chronique du groupe.',tab:'journal',sel:'#tabBar .tab:nth-child(8)'},
   {icon:'⭐',title:'Onglet XP',text:'Ton expérience et ton niveau. Le MJ peut t\'attribuer de l\'XP directement. Quand tu passes un niveau, un onglet ⬆ Niveau + apparaît pour choisir tes améliorations.',tab:'xp',sel:'#tabBar .tab:nth-child(9)'},
+  {icon:'🎲',title:'Le bouton dé',text:'Le bouton 🎲 en bas à droite est ton lanceur de dés rapide. Un appui court ouvre le panneau complet — d4, d6, d8, d10, d12, d20, d100. Un appui long affiche des raccourcis vers le Journal et ton onglet Perso.',tab:null,sel:'#diceFloat'},
   {icon:'🔒',title:'Confidentialité',text:'Le cadenas 🔒 en bout de barre d\'onglets te permet de choisir les onglets que les autres joueurs peuvent voir. Chaque onglet peut être rendu public ou privé.',tab:'perso',sel:'#tabBar .tab[onclick*="openPrivacySettings"]'},
   {icon:'💾',title:'Sauvegarde',text:'Le bouton 💾 dans le header sauvegarde tes modifications. Pense à sauvegarder régulièrement — le bouton brille en doré quand des changements n\'ont pas encore été sauvegardés. (Ce serait bête de perdre du loot)',tab:null,sel:'#saveBtn'},
 ];
@@ -2146,10 +2229,12 @@ fbAuth.onAuthStateChanged(async user=>{
       const doc=await fbDb.collection('users').doc(user.uid).get();
       currentUserData=doc.exists?doc.data():{displayName:user.displayName||'Utilisateur',role:'Joueur'};
     }catch(e){currentUserData={displayName:user.displayName||'Utilisateur',role:'Joueur'};}
+    hideSplash();
     showHub();
     loadMJCompLib();
   }else{
     currentUser=null;currentUserData=null;
+    hideSplash();
     showAuthScreen();
   }
 });
@@ -2877,7 +2962,7 @@ function renderTabBar(){
   const bar=document.getElementById('tabBar');if(!bar)return;
   const p=P();
   if(!p.created){bar.innerHTML='';return;}
-  const TABS=[
+  let TABS=[
     {id:'perso',label:'🧑 Perso'},
     {id:'competences',label:'🎯 Compétences'},
     {id:'combat',label:'⚔️ Combat'},
@@ -2888,10 +2973,47 @@ function renderTabBar(){
     {id:'journal',label:'📝 Journal'},
     {id:'xp',label:'⭐ XP'},
   ];
+  if(p.tabOrder&&p.tabOrder.length){
+    const ordered=[];
+    p.tabOrder.forEach(id=>{const t=TABS.find(x=>x.id===id);if(t)ordered.push(t);});
+    TABS.forEach(t=>{if(!ordered.find(x=>x.id===t.id))ordered.push(t);});
+    TABS=ordered;
+  }
   if(p.pendingLevelUp)TABS.push({id:'levelup',label:'⬆ Niveau +',cls:'lvlup'});
-  // Onglet actif = state.activeTab
   bar.innerHTML=TABS.map(t=>`<button class="tab${state.activeTab===t.id?' on':''}${t.cls?' '+t.cls:''}" onclick="setTab('${t.id}')">${t.label}</button>`).join('')
-    +`<button class="tab" onclick="openPrivacySettings()" title="Confidentialité" style="margin-left:auto;opacity:.7;font-size:13px">🔒</button>`;
+    +`<button class="tab" onclick="openPrivacySettings()" title="Confidentialité" style="margin-left:auto;opacity:.7;font-size:13px">🔒</button>`
+    +`<button class="tab" onclick="openTabOrderSettings()" title="Réorganiser les onglets" style="opacity:.7;font-size:13px">↕</button>`;
+}
+
+function openTabOrderSettings(){
+  const p=P();
+  const BASE_IDS=['perso','competences','combat','sorts','equipement','sac','historique','journal','xp'];
+  const LABELS={perso:'🧑 Perso',competences:'🎯 Compétences',combat:'⚔️ Combat',sorts:'✨ Sorts',equipement:'🛡️ Équip.',sac:'🎒 Sac',historique:'📖 Historique',journal:'📝 Journal',xp:'⭐ XP'};
+  if(!p.tabOrder||p.tabOrder.length<BASE_IDS.length)p.tabOrder=[...BASE_IDS];
+  window._tabOrderMove=(id,dir)=>{
+    const order=p.tabOrder;const i=order.indexOf(id);const j=i+dir;
+    if(j<0||j>=order.length)return;
+    [order[i],order[j]]=[order[j],order[i]];
+    _markUnsaved();renderTabBar();openTabOrderSettings();
+  };
+  window._tabOrderReset=()=>{
+    p.tabOrder=[...BASE_IDS];_markUnsaved();renderTabBar();openTabOrderSettings();
+  };
+  const rows=p.tabOrder.map((id,i)=>{
+    const isFirst=i===0;const isLast=i===p.tabOrder.length-1;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px">
+      <span style="font-size:14px;flex:1">${LABELS[id]||id}</span>
+      <button onclick="_tabOrderMove('${id}',-1)" ${isFirst?'disabled':''} style="background:none;border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 9px;cursor:pointer;font-size:14px;opacity:${isFirst?.3:1}">↑</button>
+      <button onclick="_tabOrderMove('${id}',1)" ${isLast?'disabled':''} style="background:none;border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 9px;cursor:pointer;font-size:14px;opacity:${isLast?.3:1}">↓</button>
+    </div>`;
+  }).join('');
+  openModal(`<div class="pt">↕ Réorganiser les onglets</div>
+    <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Déplace les onglets pour les mettre dans l'ordre qui te convient. La modification est sauvegardée avec ta fiche.</p>
+    ${rows}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:8px">
+      <button class="btn bsm" style="color:var(--text3)" onclick="_tabOrderReset()">↺ Ordre par défaut</button>
+      <button class="btn" onclick="closeModal()">Fermer</button>
+    </div>`);
 }
 
 function setTab(id){
@@ -4232,7 +4354,7 @@ function tabEquipement(p){
   const eq=p.equip||{};
   const slotHtml=s=>{const item=eq[s.id];const isMagic=item&&item.magic;return`<div class="eq-slot${item?' filled':''}${isMagic?' magic-slot':''}" style="${isMagic?'border-color:#9b59b6':''}" onclick="openEquipSlot('${s.id}')">
     <div class="eq-slot-label">${s.icon} ${s.label}</div>
-    ${item?`<div class="eq-slot-item">${esc(item.name)}${isMagic?' ✨':''}</div><span onclick="event.stopPropagation();unequipSlot('${s.id}')" title="Retirer l'objet" style="font-size:10px;color:var(--text3);cursor:pointer;margin-top:2px">↩</span>`:`<div class="eq-slot-empty">Vide</div>`}
+    ${item?`<div class="eq-slot-item">${esc(item.name)}${isMagic?' ✨':''}</div><button class="btn bsm" onclick="event.stopPropagation();unequipSlot('${s.id}')" style="width:100%;margin-top:4px;color:#e53935;border-color:rgba(229,57,53,.3);font-size:10px;padding:2px 0">✕ Retirer</button>`:`<div class="eq-slot-empty">Vide</div>`}
   </div>`;};
   const left=[{id:'head',label:'Tête',icon:'🪖'},{id:'shoulders',label:'Épaules',icon:'🧥'},{id:'chest',label:'Torse',icon:'🛡'},{id:'hands',label:'Mains',icon:'🧤'},{id:'legs',label:'Jambes',icon:'👖'}];
   const right=[{id:'neck',label:'Cou',icon:'📿'},{id:'ring1',label:'Anneau G',icon:'💍'},{id:'ring2',label:'Anneau D',icon:'💍'},{id:'waist',label:'Ceinture',icon:'🪢'},{id:'feet',label:'Pieds',icon:'👢'}];
@@ -4293,17 +4415,61 @@ function tabEquipement(p){
   </div>`;
 }
 
+function _calcArmorCA(p){
+  const abs=p.abilities||[10,10,10,10,10,10];
+  const dexM=Math.floor((abs[1]-10)/2);
+  const eq=p.equip||{};
+  let base=null;
+  if(eq.chest&&eq.chest.name){
+    const arm=SRD.armors.find(a=>a.name===eq.chest.name);
+    if(arm){
+      const ca=arm.ca||'';
+      if(ca.includes('max 2'))base=(parseInt(ca)||14)+Math.min(dexM,2);
+      else if(ca.includes('DEX'))base=(parseInt(ca)||11)+dexM;
+      else base=parseInt(ca)||10;
+    }
+  }
+  if(base===null)base=10+dexM;
+  if(eq.offhand&&eq.offhand.name){
+    const shield=SRD.armors.find(a=>a.name===eq.offhand.name&&a.type==='Bouclier');
+    if(shield)base+=2;
+  }
+  return base;
+}
 function openEquipSlot(slotId){
   const p=P();const inv=(p.inventory||[]).filter(i=>i.name&&i.qty>0);
-  openModal(`<div class="pt">Équiper dans : ${slotId}</div>
-    ${inv.length?inv.map(item=>`<div class="aci" onclick="equipItem('${slotId}','${esc(item.name)}','${esc(item.desc||'')}',${item.magic||false},'${esc(item.linkedTo||'')}')">
-      <div class="ain">${esc(item.name)}${item.magic?` <span class="magic-badge">✨ Magique${item.linkedTo?' • '+esc(item.linkedTo):''}</span>`:''}</div>
-      <div class="ais">${esc(item.desc||'')}</div>
-    </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:8px">Sac vide.</div>`}
-    <button class="btn bsm bdanger" style="margin-top:8px;width:100%" onclick="closeModal()">Fermer</button>`);
+  const SLOT_LABELS={head:'🪖 Tête',shoulders:'🧥 Épaules',chest:'🛡 Torse',hands:'🧤 Mains',legs:'👖 Jambes',feet:'👢 Pieds',neck:'📿 Cou',ring1:'💍 Anneau G',ring2:'💍 Anneau D',waist:'🪢 Ceinture',back:'🧣 Dos',mainhand:'⚔️ Main droite',offhand:'🗡️ Main gauche',ranged:'🏹 Distance'};
+  const isWeaponSlot=['mainhand','offhand','ranged'].includes(slotId);
+  const isArmorSlot=['chest','head','shoulders','hands','legs','feet','back','waist','neck','ring1','ring2'].includes(slotId);
+  let html='';
+  if(isWeaponSlot){
+    const srdW=SRD.weapons.map(w=>`<div class="aci" onclick="equipItem('${slotId}','${esc(w.name)}','${esc(w.damage||'')} — ${esc(w.properties||'')}',false,'')"><div class="ain">${esc(w.name)}</div><div class="ais">${esc(w.damage||'')} · ${esc(w.subtype||'')}</div></div>`).join('');
+    html+=`<div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">⚔ Armes SRD</div>${srdW}`;
+  }
+  if(slotId==='offhand'){
+    const shields=SRD.armors.filter(a=>a.type==='Bouclier').map(a=>`<div class="aci" onclick="equipItem('${slotId}','${esc(a.name)}','CA ${esc(a.ca||'')}',false,'')"><div class="ain">${esc(a.name)}</div><div class="ais">CA ${esc(a.ca||'')} · ${esc(a.type||'')}</div></div>`).join('');
+    if(shields)html+=`<div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:8px 0 5px">🛡 Boucliers SRD</div>${shields}`;
+  }
+  if(isArmorSlot){
+    const srdA=SRD.armors.filter(a=>a.type!=='Bouclier').map(a=>`<div class="aci" onclick="equipItem('${slotId}','${esc(a.name)}','CA ${esc(a.ca||'')} — ${esc(a.type||'')}',false,'')"><div class="ain">${esc(a.name)}</div><div class="ais">CA ${esc(a.ca||'')} · ${esc(a.type||'')} · ${esc(a.price||'')}</div></div>`).join('');
+    html+=`<div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">🛡 Armures SRD</div>${srdA}`;
+  }
+  html+=`<div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:${html?'10':'0'}px 0 5px">🎒 Depuis ton sac</div>`;
+  html+=inv.length?inv.map(item=>`<div class="aci" onclick="equipItem('${slotId}','${esc(item.name)}','${esc(item.desc||'')}',${item.magic||false},'${esc(item.linkedTo||'')}')"><div class="ain">${esc(item.name)}${item.magic?` <span class="magic-badge">✨</span>`:''}</div>${item.desc?`<div class="ais">${esc(item.desc)}</div>`:''}</div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:4px;font-style:italic">Sac vide.</div>`;
+  openModal(`<div class="pt">${SLOT_LABELS[slotId]||slotId}</div><div style="max-height:400px;overflow-y:auto">${html}</div><button class="btn bsm" style="width:100%;margin-top:8px" onclick="closeModal()">Fermer</button>`);
 }
-function equipItem(slotId,name,desc,magic,linkedTo){const p=P();if(!p.equip)p.equip={};p.equip[slotId]={name,desc,magic:magic||false,linkedTo:linkedTo||''};closeModal();render();}
-function unequipSlot(slotId){const p=P();if(!p.equip)return;const item=p.equip[slotId];if(item){if(!p.inventory)p.inventory=[];const ex=p.inventory.find(i=>i.name===item.name);if(ex)ex.qty++;else p.inventory.push({name:item.name,qty:1,desc:item.desc||'',magic:item.magic,linkedTo:item.linkedTo});}delete p.equip[slotId];render();}
+function equipItem(slotId,name,desc,magic,linkedTo){
+  const p=P();if(!p.equip)p.equip={};
+  p.equip[slotId]={name,desc,magic:magic||false,linkedTo:linkedTo||''};
+  if(slotId==='chest'||slotId==='offhand'){const newCA=_calcArmorCA(p);if(p.ac!==newCA){p.ac=newCA;showToast('🛡 CA mise à jour : '+newCA);}}
+  closeModal();render();}
+function unequipSlot(slotId){
+  const p=P();if(!p.equip)return;
+  const item=p.equip[slotId];
+  if(item){if(!p.inventory)p.inventory=[];const ex=p.inventory.find(i=>i.name===item.name);if(ex)ex.qty++;else p.inventory.push({name:item.name,qty:1,desc:item.desc||'',magic:item.magic,linkedTo:item.linkedTo});}
+  delete p.equip[slotId];
+  if(slotId==='chest'||slotId==='offhand'){const newCA=_calcArmorCA(p);p.ac=newCA;showToast('🛡 CA recalculée : '+newCA);}
+  render();}
 function mjToggleWeaponProf(subtype){
   const p=P();if(!p.weaponProfs)p.weaponProfs=[];
   const key=subtype.toLowerCase();
@@ -7042,8 +7208,22 @@ function mjFillMonster(idx){
   if(hpEl)hpEl.value=hp;
   if(acEl)acEl.value=ac;
   if(initEl)initEl.value=dexMod;
+  // Auto-populate attacks from compendium acts field
+  _mjNewMonsterAttacks=[];
+  const acts=Array.isArray(m.acts)?m.acts:(m.acts?[m.acts]:[]);
+  acts.forEach(act=>{
+    if(!act.atk)return;
+    const parts=act.atk.split('|');
+    if(parts.length<3)return;
+    const bonus=parseInt(parts[1])||0;
+    const dmgStr=(parts[2]||'1d4').trim();
+    const dmgMatch=dmgStr.match(/^(\d+d\d+)([+-]\d+)?/);
+    if(!dmgMatch)return;
+    _mjNewMonsterAttacks.push({name:act.n||parts[0]||'Attaque',atkBonus:bonus,dmgDice:dmgMatch[1],dmgBonus:parseInt(dmgMatch[2])||0,dmgType:'',range:''});
+  });
+  mjRenderAttacksList();
   const res=document.getElementById('monResults');
-  if(res)res.innerHTML='<div style="font-size:11px;color:var(--cp);text-align:center;padding:4px">✅ Formulaire rempli avec "'+esc(m.n)+'"</div>';
+  if(res)res.innerHTML='<div style="font-size:11px;color:var(--cp);text-align:center;padding:4px">✅ Formulaire rempli avec "'+esc(m.n)+(_mjNewMonsterAttacks.length?'" · '+_mjNewMonsterAttacks.length+' attaque(s) importée(s)':'"')+'</div>';
 }
 
 function mjConfirmAddMonster(){
