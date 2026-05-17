@@ -152,7 +152,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 .hub-hdr{display:flex;flex-direction:row;align-items:center;gap:10px;padding:10px 16px;background:rgba(12,8,4,.75);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(200,168,75,.2);position:relative;z-index:2}
 .hub-hdr-title{font-family:var(--F);font-size:18px;color:var(--cp);letter-spacing:.08em;text-shadow:0 0 20px rgba(200,168,75,.4);line-height:1.2;white-space:nowrap}
 .hub-hdr-row2{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
-.hub-body{max-width:920px;margin:0 auto;padding:16px;position:relative;z-index:1}
+.hub-body{max-width:920px;margin:0 auto;padding:16px 16px 90px;position:relative;z-index:1}
 .hub-section{margin-bottom:24px}
 .hub-section-title{font-family:var(--F);font-size:13px;color:var(--cp);letter-spacing:.06em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid rgba(200,168,75,.2);display:flex;align-items:center;justify-content:space-between}
 .table-card{background:rgba(16,11,7,.8);border:1px solid rgba(200,168,75,.2);border-radius:12px;padding:16px;margin-bottom:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,.4)}
@@ -322,8 +322,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--B);font-size:14px;
 /* ===== RESPONSIVE MOBILE ===== */
 @media(max-width:640px){
   /* Espacement global */
-  #app,#mjScreen{padding:6px}
-  .hub-body{padding:10px}
+  #app,#mjScreen{padding:6px 6px 90px}
+  .hub-body{padding:10px 10px 90px}
   .panel{padding:10px 8px}
   .hdr{padding:8px 10px}
   /* Grilles nommées */
@@ -528,6 +528,17 @@ if('serviceWorker' in navigator){
     }
   });
 }
+// Rechargement automatique si l'appli est restée en fond plus de 15 minutes
+let _hiddenAt=0;
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    _hiddenAt=Date.now();
+  } else if(_hiddenAt&&Date.now()-_hiddenAt>15*60*1000){
+    location.reload(true);
+  } else {
+    _hiddenAt=0;
+  }
+});
 
 let currentUser=null;
 let currentUserData=null;
@@ -4527,11 +4538,11 @@ function tabSac(p){
       ${isMJ()?`<button class="btn bsm bac" onclick="openMJCreateItem()">🎲 Créer objet/arme</button>`:''}
     </div>
     <div style="display:flex;gap:6px;margin-bottom:4px">
-      <input class="fi" id="invName" placeholder="${ITEMS_DB?'Rechercher parmi '+ITEMS_DB.length.toLocaleString()+' objets...':'Nom ou recherche compendium...'}" oninput="filterSrdItems(this.value)" onfocus="filterSrdItems(this.value)" style="flex:1">
+      <input class="fi" id="invName" placeholder="${ITEMS_DB?'Rechercher parmi '+ITEMS_DB.length.toLocaleString()+' objets...':'Nom ou recherche compendium...'}" oninput="filterSrdItems(this.value)" onfocus="if(this.value.trim())filterSrdItems(this.value)" onblur="setTimeout(()=>{const el=document.getElementById('srdList');if(el)el.style.display='none';},200)" style="flex:1">
       <button class="btn bsm bac" onclick="addInvItem()">+</button>
     </div>
     ${!ITEMS_DB?`<button class="btn bsm" style="font-size:11px;width:100%;margin-bottom:6px" onclick="loadItemsDB(()=>render())">📚 Charger le compendium d'objets</button>`:''}
-    <div id="srdList" style="margin-bottom:8px;max-height:220px;overflow-y:auto">${renderSrdList('')}</div>
+    <div id="srdList" style="display:none;margin-bottom:8px;max-height:220px;overflow-y:auto"></div>
     ${invRows}
   </div>
   ${isMJ()&&mjPool.customItems.length?`<div class="panel" style="margin-top:8px">
@@ -4627,7 +4638,13 @@ function renderSrdList(q){
   if(!q.trim())return[...SRD.weapons,...SRD.armors].slice(0,15).map(i=>`<div class="aci" onclick="addSrdItem('${esc(i.name)}','${esc(i.damage||i.ca||'')}','${esc(i.subtype||i.type||'')}')"><div class="ain">${esc(i.name)}</div><div class="ais">${esc(i.damage||i.ca||'')} — ${esc(i.price||'')}</div></div>`).join('');
   return[...SRD.weapons,...SRD.armors].filter(i=>i.name.toLowerCase().includes(q.toLowerCase())).slice(0,8).map(i=>`<div class="aci" onclick="addSrdItem('${esc(i.name)}','${esc(i.damage||i.ca||'')}','${esc(i.subtype||i.type||'')}')"><div class="ain">${esc(i.name)}</div><div class="ais">${esc(i.damage||i.ca||'')} — ${esc(i.price||'')}</div></div>`).join('');
 }
-function filterSrdItems(q){const el=document.getElementById('srdList');if(el)el.innerHTML=renderSrdList(q);}
+function filterSrdItems(q){
+  const el=document.getElementById('srdList');if(!el)return;
+  const trimmed=q.trim();
+  if(!trimmed){el.style.display='none';el.innerHTML='';return;}
+  el.innerHTML=renderSrdList(q);
+  el.style.display='block';
+}
 function addSrdItem(name,stats,type){const p=P();_addToInventory(p,{name,qty:1,desc:`${type} — ${stats}`,magic:false,linkedTo:''});render();}
 function addCompendiumItem(idx){
   const it=ITEMS_DB[idx];if(!it)return;
@@ -6135,12 +6152,6 @@ document.addEventListener('click',e=>{
     diceOpen=false;panel.style.display='none';
   }
 });
-
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('message',e=>{
-    if(e.data?.type==='SW_UPDATED') window.location.reload();
-  });
-}
 
 createDiceButton();
 
